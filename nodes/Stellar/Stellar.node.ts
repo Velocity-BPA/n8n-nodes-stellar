@@ -1,1015 +1,1651 @@
-/*
- * Copyright (c) Velocity BPA, LLC
- * Licensed under the Business Source License 1.1
- * Commercial use requires a separate commercial license.
- * See LICENSE file for details.
+/**
+ * Copyright (c) 2026 Velocity BPA
+ * 
+ * Licensed under the Business Source License 1.1 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *     https://github.com/VelocityBPA/n8n-nodes-stellar/blob/main/LICENSE
+ * 
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
-import type {
-	IExecuteFunctions,
-	INodeExecutionData,
-	INodeType,
-	INodeTypeDescription,
-	IDataObject,
-} from 'n8n-workflow';
-import * as StellarSdk from '@stellar/stellar-sdk';
-import axios from 'axios';
 import {
-	getHorizonUrl,
-	getNetworkPassphrase,
-	getSorobanRpcUrl,
-	FRIENDBOT_URLS,
-	NetworkType,
-	DEFAULT_SETTINGS,
-} from './constants/networks';
-
-// Runtime licensing notice (logged once per node load)
-const LICENSING_NOTICE_LOGGED = Symbol.for('stellar.licensing.logged');
-function logLicensingNotice(): void {
-	const globalAny = global as Record<symbol, boolean>;
-	if (!globalAny[LICENSING_NOTICE_LOGGED]) {
-		console.warn(`[Velocity BPA Licensing Notice]
-
-This n8n node is licensed under the Business Source License 1.1 (BSL 1.1).
-
-Use of this node by for-profit organizations in production environments requires a commercial license from Velocity BPA.
-
-For licensing information, visit https://velobpa.com/licensing or contact licensing@velobpa.com.
-`);
-		globalAny[LICENSING_NOTICE_LOGGED] = true;
-	}
-}
+  IExecuteFunctions,
+  INodeExecutionData,
+  INodeType,
+  INodeTypeDescription,
+  NodeOperationError,
+  NodeApiError,
+} from 'n8n-workflow';
 
 export class Stellar implements INodeType {
-	description: INodeTypeDescription = {
-		displayName: 'Stellar',
-		name: 'stellar',
-		icon: 'file:stellar.svg',
-		group: ['transform'],
-		version: 1,
-		subtitle: '={{$parameter["resource"] + ": " + $parameter["operation"]}}',
-		description: 'Interact with Stellar blockchain',
-		defaults: {
-			name: 'Stellar',
-		},
-		inputs: ['main'],
-		outputs: ['main'],
-		credentials: [
-			{
-				name: 'stellarNetwork',
-				required: true,
-			},
-		],
-		properties: [
-			{
-				displayName: 'Resource',
-				name: 'resource',
-				type: 'options',
-				noDataExpression: true,
-				options: [
-					{ name: 'Account', value: 'account' },
-					{ name: 'Asset', value: 'asset' },
-					{ name: 'DEX', value: 'dex' },
-					{ name: 'Ledger', value: 'ledger' },
-					{ name: 'Payment', value: 'payment' },
-					{ name: 'Soroban', value: 'soroban' },
-					{ name: 'Transaction', value: 'transaction' },
-				],
-				default: 'account',
-			},
-			// Account Operations
-			{
-				displayName: 'Operation',
-				name: 'operation',
-				type: 'options',
-				noDataExpression: true,
-				displayOptions: { show: { resource: ['account'] } },
-				options: [
-					{ name: 'Create Account', value: 'createAccount' },
-					{ name: 'Fund Testnet', value: 'fundTestnet' },
-					{ name: 'Generate Keypair', value: 'generateKeypair' },
-					{ name: 'Get Info', value: 'getInfo' },
-					{ name: 'Merge Account', value: 'mergeAccount' },
-					{ name: 'Set Data', value: 'setData' },
-					{ name: 'Set Options', value: 'setOptions' },
-				],
-				default: 'getInfo',
-			},
-			// Payment Operations
-			{
-				displayName: 'Operation',
-				name: 'operation',
-				type: 'options',
-				noDataExpression: true,
-				displayOptions: { show: { resource: ['payment'] } },
-				options: [
-					{ name: 'Send Payment', value: 'sendPayment' },
-					{ name: 'Path Payment', value: 'pathPayment' },
-					{ name: 'Create Claimable Balance', value: 'createClaimableBalance' },
-					{ name: 'Claim Balance', value: 'claimBalance' },
-				],
-				default: 'sendPayment',
-			},
-			// Asset Operations
-			{
-				displayName: 'Operation',
-				name: 'operation',
-				type: 'options',
-				noDataExpression: true,
-				displayOptions: { show: { resource: ['asset'] } },
-				options: [
-					{ name: 'Change Trust', value: 'changeTrust' },
-					{ name: 'Get Info', value: 'getAssetInfo' },
-					{ name: 'Issue Asset', value: 'issueAsset' },
-				],
-				default: 'changeTrust',
-			},
-			// DEX Operations
-			{
-				displayName: 'Operation',
-				name: 'operation',
-				type: 'options',
-				noDataExpression: true,
-				displayOptions: { show: { resource: ['dex'] } },
-				options: [
-					{ name: 'Cancel Offer', value: 'cancelOffer' },
-					{ name: 'Create Buy Offer', value: 'createBuyOffer' },
-					{ name: 'Create Sell Offer', value: 'createSellOffer' },
-					{ name: 'Get Orderbook', value: 'getOrderbook' },
-					{ name: 'Get Trades', value: 'getTrades' },
-					{ name: 'List Offers', value: 'listOffers' },
-				],
-				default: 'getOrderbook',
-			},
-			// Transaction Operations
-			{
-				displayName: 'Operation',
-				name: 'operation',
-				type: 'options',
-				noDataExpression: true,
-				displayOptions: { show: { resource: ['transaction'] } },
-				options: [
-					{ name: 'Get Transaction', value: 'getTransaction' },
-					{ name: 'Sign XDR', value: 'signXdr' },
-					{ name: 'Submit XDR', value: 'submitXdr' },
-				],
-				default: 'getTransaction',
-			},
-			// Ledger Operations
-			{
-				displayName: 'Operation',
-				name: 'operation',
-				type: 'options',
-				noDataExpression: true,
-				displayOptions: { show: { resource: ['ledger'] } },
-				options: [
-					{ name: 'Get By Sequence', value: 'getBySequence' },
-					{ name: 'Get Fee Stats', value: 'getFeeStats' },
-					{ name: 'Get Latest', value: 'getLatest' },
-				],
-				default: 'getLatest',
-			},
-			// Soroban Operations
-			{
-				displayName: 'Operation',
-				name: 'operation',
-				type: 'options',
-				noDataExpression: true,
-				displayOptions: { show: { resource: ['soroban'] } },
-				options: [
-					{ name: 'Get Health', value: 'getHealth' },
-					{ name: 'Invoke Contract', value: 'invokeContract' },
-					{ name: 'Simulate Transaction', value: 'simulateTransaction' },
-				],
-				default: 'getHealth',
-			},
-			// Common Fields
-			{
-				displayName: 'Account ID',
-				name: 'accountId',
-				type: 'string',
-				default: '',
-				placeholder: 'G...',
-				description: 'Stellar account public key',
-				displayOptions: {
-					show: {
-						resource: ['account'],
-						operation: ['getInfo', 'fundTestnet', 'mergeAccount'],
-					},
-				},
-			},
-			{
-				displayName: 'Destination Account',
-				name: 'destination',
-				type: 'string',
-				default: '',
-				placeholder: 'G...',
-				description: 'Destination account public key',
-				displayOptions: {
-					show: {
-						resource: ['account', 'payment'],
-						operation: ['createAccount', 'mergeAccount', 'sendPayment', 'pathPayment'],
-					},
-				},
-			},
-			{
-				displayName: 'Amount',
-				name: 'amount',
-				type: 'string',
-				default: '',
-				placeholder: '10',
-				description: 'Amount in the asset unit (not stroops)',
-				displayOptions: {
-					show: {
-						resource: ['account', 'payment', 'dex'],
-						operation: ['createAccount', 'sendPayment', 'pathPayment', 'createBuyOffer', 'createSellOffer', 'createClaimableBalance'],
-					},
-				},
-			},
-			{
-				displayName: 'Asset Code',
-				name: 'assetCode',
-				type: 'string',
-				default: 'XLM',
-				placeholder: 'USDC',
-				description: 'Asset code (use XLM for native)',
-				displayOptions: {
-					show: {
-						resource: ['payment', 'asset', 'dex'],
-						operation: ['sendPayment', 'pathPayment', 'changeTrust', 'getAssetInfo', 'issueAsset', 'getOrderbook', 'createBuyOffer', 'createSellOffer', 'getTrades', 'createClaimableBalance'],
-					},
-				},
-			},
-			{
-				displayName: 'Asset Issuer',
-				name: 'assetIssuer',
-				type: 'string',
-				default: '',
-				placeholder: 'G...',
-				description: 'Issuer account (leave empty for XLM)',
-				displayOptions: {
-					show: {
-						resource: ['payment', 'asset', 'dex'],
-						operation: ['sendPayment', 'pathPayment', 'changeTrust', 'getAssetInfo', 'getOrderbook', 'createBuyOffer', 'createSellOffer', 'getTrades', 'createClaimableBalance'],
-					},
-				},
-			},
-			// DEX-specific fields
-			{
-				displayName: 'Selling Asset Code',
-				name: 'sellingAssetCode',
-				type: 'string',
-				default: 'XLM',
-				displayOptions: {
-					show: {
-						resource: ['dex'],
-						operation: ['getOrderbook', 'createSellOffer', 'createBuyOffer'],
-					},
-				},
-			},
-			{
-				displayName: 'Selling Asset Issuer',
-				name: 'sellingAssetIssuer',
-				type: 'string',
-				default: '',
-				displayOptions: {
-					show: {
-						resource: ['dex'],
-						operation: ['getOrderbook', 'createSellOffer', 'createBuyOffer'],
-					},
-				},
-			},
-			{
-				displayName: 'Buying Asset Code',
-				name: 'buyingAssetCode',
-				type: 'string',
-				default: 'USDC',
-				displayOptions: {
-					show: {
-						resource: ['dex'],
-						operation: ['getOrderbook', 'createSellOffer', 'createBuyOffer'],
-					},
-				},
-			},
-			{
-				displayName: 'Buying Asset Issuer',
-				name: 'buyingAssetIssuer',
-				type: 'string',
-				default: '',
-				displayOptions: {
-					show: {
-						resource: ['dex'],
-						operation: ['getOrderbook', 'createSellOffer', 'createBuyOffer'],
-					},
-				},
-			},
-			{
-				displayName: 'Price',
-				name: 'price',
-				type: 'string',
-				default: '',
-				placeholder: '0.10',
-				description: 'Price per unit of the selling asset',
-				displayOptions: {
-					show: {
-						resource: ['dex'],
-						operation: ['createSellOffer', 'createBuyOffer'],
-					},
-				},
-			},
-			{
-				displayName: 'Offer ID',
-				name: 'offerId',
-				type: 'string',
-				default: '',
-				description: 'Offer ID to cancel',
-				displayOptions: {
-					show: {
-						resource: ['dex'],
-						operation: ['cancelOffer'],
-					},
-				},
-			},
-			// Transaction fields
-			{
-				displayName: 'Transaction Hash',
-				name: 'transactionHash',
-				type: 'string',
-				default: '',
-				displayOptions: {
-					show: {
-						resource: ['transaction'],
-						operation: ['getTransaction'],
-					},
-				},
-			},
-			{
-				displayName: 'XDR',
-				name: 'xdr',
-				type: 'string',
-				default: '',
-				description: 'Transaction XDR envelope',
-				displayOptions: {
-					show: {
-						resource: ['transaction'],
-						operation: ['signXdr', 'submitXdr'],
-					},
-				},
-			},
-			// Ledger fields
-			{
-				displayName: 'Ledger Sequence',
-				name: 'ledgerSequence',
-				type: 'number',
-				default: 0,
-				displayOptions: {
-					show: {
-						resource: ['ledger'],
-						operation: ['getBySequence'],
-					},
-				},
-			},
-			// Soroban fields
-			{
-				displayName: 'Contract ID',
-				name: 'contractId',
-				type: 'string',
-				default: '',
-				placeholder: 'C...',
-				displayOptions: {
-					show: {
-						resource: ['soroban'],
-						operation: ['invokeContract', 'simulateTransaction'],
-					},
-				},
-			},
-			{
-				displayName: 'Function Name',
-				name: 'functionName',
-				type: 'string',
-				default: '',
-				displayOptions: {
-					show: {
-						resource: ['soroban'],
-						operation: ['invokeContract', 'simulateTransaction'],
-					},
-				},
-			},
-			{
-				displayName: 'Function Arguments (JSON)',
-				name: 'functionArgs',
-				type: 'string',
-				default: '[]',
-				description: 'JSON array of function arguments',
-				displayOptions: {
-					show: {
-						resource: ['soroban'],
-						operation: ['invokeContract', 'simulateTransaction'],
-					},
-				},
-			},
-			// Account Data fields
-			{
-				displayName: 'Data Name',
-				name: 'dataName',
-				type: 'string',
-				default: '',
-				displayOptions: {
-					show: {
-						resource: ['account'],
-						operation: ['setData'],
-					},
-				},
-			},
-			{
-				displayName: 'Data Value',
-				name: 'dataValue',
-				type: 'string',
-				default: '',
-				description: 'Leave empty to delete the data entry',
-				displayOptions: {
-					show: {
-						resource: ['account'],
-						operation: ['setData'],
-					},
-				},
-			},
-			// Trust limit
-			{
-				displayName: 'Trust Limit',
-				name: 'trustLimit',
-				type: 'string',
-				default: '',
-				placeholder: '1000000',
-				description: 'Maximum amount to trust (leave empty for default)',
-				displayOptions: {
-					show: {
-						resource: ['asset'],
-						operation: ['changeTrust'],
-					},
-				},
-			},
-			// Claimable balance
-			{
-				displayName: 'Balance ID',
-				name: 'balanceId',
-				type: 'string',
-				default: '',
-				displayOptions: {
-					show: {
-						resource: ['payment'],
-						operation: ['claimBalance'],
-					},
-				},
-			},
-			{
-				displayName: 'Claimants (JSON)',
-				name: 'claimants',
-				type: 'string',
-				default: '[]',
-				description: 'JSON array of claimant objects with destination and predicate',
-				displayOptions: {
-					show: {
-						resource: ['payment'],
-						operation: ['createClaimableBalance'],
-					},
-				},
-			},
-			// Set Options fields
-			{
-				displayName: 'Home Domain',
-				name: 'homeDomain',
-				type: 'string',
-				default: '',
-				displayOptions: {
-					show: {
-						resource: ['account'],
-						operation: ['setOptions'],
-					},
-				},
-			},
-			{
-				displayName: 'Inflation Destination',
-				name: 'inflationDest',
-				type: 'string',
-				default: '',
-				displayOptions: {
-					show: {
-						resource: ['account'],
-						operation: ['setOptions'],
-					},
-				},
-			},
-		],
-	};
+  description: INodeTypeDescription = {
+    displayName: 'Stellar',
+    name: 'stellar',
+    icon: 'file:stellar.svg',
+    group: ['transform'],
+    version: 1,
+    subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
+    description: 'Interact with the Stellar API',
+    defaults: {
+      name: 'Stellar',
+    },
+    inputs: ['main'],
+    outputs: ['main'],
+    credentials: [
+      {
+        name: 'stellarApi',
+        required: true,
+      },
+    ],
+    properties: [
+      // Resource selector
+      {
+        displayName: 'Resource',
+        name: 'resource',
+        type: 'options',
+        noDataExpression: true,
+        options: [
+          {
+            name: 'Accounts',
+            value: 'accounts',
+          },
+          {
+            name: 'unknown',
+            value: 'unknown',
+          },
+          {
+            name: 'unknown',
+            value: 'unknown',
+          },
+          {
+            name: 'unknown',
+            value: 'unknown',
+          },
+          {
+            name: 'Assets',
+            value: 'assets',
+          },
+          {
+            name: 'SorobanContracts',
+            value: 'sorobanContracts',
+          }
+        ],
+        default: 'accounts',
+      },
+      // Operation dropdowns per resource
+{
+  displayName: 'Operation',
+  name: 'operation',
+  type: 'options',
+  noDataExpression: true,
+  displayOptions: {
+    show: {
+      resource: ['accounts'],
+    },
+  },
+  options: [
+    {
+      name: 'Get Account',
+      value: 'getAccount',
+      description: 'Get account details and balances',
+      action: 'Get account details',
+    },
+    {
+      name: 'Get Accounts',
+      value: 'getAccounts',
+      description: 'Get list of accounts',
+      action: 'Get list of accounts',
+    },
+    {
+      name: 'Get Account Transactions',
+      value: 'getAccountTransactions',
+      description: 'Get transactions for account',
+      action: 'Get account transactions',
+    },
+    {
+      name: 'Get Account Operations',
+      value: 'getAccountOperations',
+      description: 'Get operations for account',
+      action: 'Get account operations',
+    },
+    {
+      name: 'Get Account Payments',
+      value: 'getAccountPayments',
+      description: 'Get payments for account',
+      action: 'Get account payments',
+    },
+    {
+      name: 'Get Account Effects',
+      value: 'getAccountEffects',
+      description: 'Get effects for account',
+      action: 'Get account effects',
+    },
+  ],
+  default: 'getAccount',
+},
+{
+  displayName: 'Operation',
+  name: 'operation',
+  type: 'options',
+  noDataExpression: true,
+  displayOptions: {
+    show: {
+      resource: ['assets'],
+    },
+  },
+  options: [
+    {
+      name: 'Get Assets',
+      value: 'getAssets',
+      description: 'Get list of assets',
+      action: 'Get assets',
+    },
+    {
+      name: 'Get Asset',
+      value: 'getAsset',
+      description: 'Get specific asset details',
+      action: 'Get asset',
+    },
+    {
+      name: 'Create Asset',
+      value: 'createAsset',
+      description: 'Submit create asset transaction',
+      action: 'Create asset',
+    },
+    {
+      name: 'Change Asset Trust',
+      value: 'changeAssetTrust',
+      description: 'Submit change trust transaction',
+      action: 'Change asset trust',
+    },
+    {
+      name: 'Set Asset Options',
+      value: 'setAssetOptions',
+      description: 'Submit set options for asset',
+      action: 'Set asset options',
+    },
+  ],
+  default: 'getAssets',
+},
+{
+  displayName: 'Operation',
+  name: 'operation',
+  type: 'options',
+  noDataExpression: true,
+  displayOptions: {
+    show: {
+      resource: ['sorobanContracts'],
+    },
+  },
+  options: [
+    {
+      name: 'Invoke Contract',
+      value: 'invokeContract',
+      description: 'Invoke smart contract function',
+      action: 'Invoke contract',
+    },
+    {
+      name: 'Simulate Transaction',
+      value: 'simulateTransaction',
+      description: 'Simulate contract transaction',
+      action: 'Simulate transaction',
+    },
+    {
+      name: 'Get Contract',
+      value: 'getContract',
+      description: 'Get contract information',
+      action: 'Get contract',
+    },
+    {
+      name: 'Deploy Contract',
+      value: 'deployContract',
+      description: 'Deploy new smart contract',
+      action: 'Deploy contract',
+    },
+    {
+      name: 'Get Contract Data',
+      value: 'getContractData',
+      description: 'Get contract data entries',
+      action: 'Get contract data',
+    },
+    {
+      name: 'Get Ledger Entries',
+      value: 'getLedgerEntries',
+      description: 'Get ledger entries for contracts',
+      action: 'Get ledger entries',
+    },
+  ],
+  default: 'invokeContract',
+},
+      // Parameter definitions
+{
+  displayName: 'Account ID',
+  name: 'accountId',
+  type: 'string',
+  required: true,
+  displayOptions: {
+    show: {
+      resource: ['accounts'],
+      operation: ['getAccount'],
+    },
+  },
+  default: '',
+  description: 'The Stellar account ID (public key)',
+},
+{
+  displayName: 'Cursor',
+  name: 'cursor',
+  type: 'string',
+  required: false,
+  displayOptions: {
+    show: {
+      resource: ['accounts'],
+      operation: ['getAccounts'],
+    },
+  },
+  default: '',
+  description: 'A number that points to a specific location in a collection of responses and is pulled from the paging_token value of a record',
+},
+{
+  displayName: 'Limit',
+  name: 'limit',
+  type: 'number',
+  required: false,
+  displayOptions: {
+    show: {
+      resource: ['accounts'],
+      operation: ['getAccounts'],
+    },
+  },
+  default: 10,
+  description: 'The maximum number of records returned (1-200)',
+  typeOptions: {
+    minValue: 1,
+    maxValue: 200,
+  },
+},
+{
+  displayName: 'Order',
+  name: 'order',
+  type: 'options',
+  required: false,
+  displayOptions: {
+    show: {
+      resource: ['accounts'],
+      operation: ['getAccounts'],
+    },
+  },
+  options: [
+    {
+      name: 'Ascending',
+      value: 'asc',
+    },
+    {
+      name: 'Descending',
+      value: 'desc',
+    },
+  ],
+  default: 'asc',
+  description: 'The order in which to return rows',
+},
+{
+  displayName: 'Account ID',
+  name: 'accountId',
+  type: 'string',
+  required: true,
+  displayOptions: {
+    show: {
+      resource: ['accounts'],
+      operation: ['getAccountTransactions'],
+    },
+  },
+  default: '',
+  description: 'The Stellar account ID (public key)',
+},
+{
+  displayName: 'Cursor',
+  name: 'cursor',
+  type: 'string',
+  required: false,
+  displayOptions: {
+    show: {
+      resource: ['accounts'],
+      operation: ['getAccountTransactions'],
+    },
+  },
+  default: '',
+  description: 'A number that points to a specific location in a collection of responses',
+},
+{
+  displayName: 'Limit',
+  name: 'limit',
+  type: 'number',
+  required: false,
+  displayOptions: {
+    show: {
+      resource: ['accounts'],
+      operation: ['getAccountTransactions'],
+    },
+  },
+  default: 10,
+  description: 'The maximum number of records returned (1-200)',
+  typeOptions: {
+    minValue: 1,
+    maxValue: 200,
+  },
+},
+{
+  displayName: 'Order',
+  name: 'order',
+  type: 'options',
+  required: false,
+  displayOptions: {
+    show: {
+      resource: ['accounts'],
+      operation: ['getAccountTransactions'],
+    },
+  },
+  options: [
+    {
+      name: 'Ascending',
+      value: 'asc',
+    },
+    {
+      name: 'Descending',
+      value: 'desc',
+    },
+  ],
+  default: 'asc',
+  description: 'The order in which to return rows',
+},
+{
+  displayName: 'Account ID',
+  name: 'accountId',
+  type: 'string',
+  required: true,
+  displayOptions: {
+    show: {
+      resource: ['accounts'],
+      operation: ['getAccountOperations'],
+    },
+  },
+  default: '',
+  description: 'The Stellar account ID (public key)',
+},
+{
+  displayName: 'Cursor',
+  name: 'cursor',
+  type: 'string',
+  required: false,
+  displayOptions: {
+    show: {
+      resource: ['accounts'],
+      operation: ['getAccountOperations'],
+    },
+  },
+  default: '',
+  description: 'A number that points to a specific location in a collection of responses',
+},
+{
+  displayName: 'Limit',
+  name: 'limit',
+  type: 'number',
+  required: false,
+  displayOptions: {
+    show: {
+      resource: ['accounts'],
+      operation: ['getAccountOperations'],
+    },
+  },
+  default: 10,
+  description: 'The maximum number of records returned (1-200)',
+  typeOptions: {
+    minValue: 1,
+    maxValue: 200,
+  },
+},
+{
+  displayName: 'Order',
+  name: 'order',
+  type: 'options',
+  required: false,
+  displayOptions: {
+    show: {
+      resource: ['accounts'],
+      operation: ['getAccountOperations'],
+    },
+  },
+  options: [
+    {
+      name: 'Ascending',
+      value: 'asc',
+    },
+    {
+      name: 'Descending',
+      value: 'desc',
+    },
+  ],
+  default: 'asc',
+  description: 'The order in which to return rows',
+},
+{
+  displayName: 'Account ID',
+  name: 'accountId',
+  type: 'string',
+  required: true,
+  displayOptions: {
+    show: {
+      resource: ['accounts'],
+      operation: ['getAccountPayments'],
+    },
+  },
+  default: '',
+  description: 'The Stellar account ID (public key)',
+},
+{
+  displayName: 'Cursor',
+  name: 'cursor',
+  type: 'string',
+  required: false,
+  displayOptions: {
+    show: {
+      resource: ['accounts'],
+      operation: ['getAccountPayments'],
+    },
+  },
+  default: '',
+  description: 'A number that points to a specific location in a collection of responses',
+},
+{
+  displayName: 'Limit',
+  name: 'limit',
+  type: 'number',
+  required: false,
+  displayOptions: {
+    show: {
+      resource: ['accounts'],
+      operation: ['getAccountPayments'],
+    },
+  },
+  default: 10,
+  description: 'The maximum number of records returned (1-200)',
+  typeOptions: {
+    minValue: 1,
+    maxValue: 200,
+  },
+},
+{
+  displayName: 'Order',
+  name: 'order',
+  type: 'options',
+  required: false,
+  displayOptions: {
+    show: {
+      resource: ['accounts'],
+      operation: ['getAccountPayments'],
+    },
+  },
+  options: [
+    {
+      name: 'Ascending',
+      value: 'asc',
+    },
+    {
+      name: 'Descending',
+      value: 'desc',
+    },
+  ],
+  default: 'asc',
+  description: 'The order in which to return rows',
+},
+{
+  displayName: 'Account ID',
+  name: 'accountId',
+  type: 'string',
+  required: true,
+  displayOptions: {
+    show: {
+      resource: ['accounts'],
+      operation: ['getAccountEffects'],
+    },
+  },
+  default: '',
+  description: 'The Stellar account ID (public key)',
+},
+{
+  displayName: 'Cursor',
+  name: 'cursor',
+  type: 'string',
+  required: false,
+  displayOptions: {
+    show: {
+      resource: ['accounts'],
+      operation: ['getAccountEffects'],
+    },
+  },
+  default: '',
+  description: 'A number that points to a specific location in a collection of responses',
+},
+{
+  displayName: 'Limit',
+  name: 'limit',
+  type: 'number',
+  required: false,
+  displayOptions: {
+    show: {
+      resource: ['accounts'],
+      operation: ['getAccountEffects'],
+    },
+  },
+  default: 10,
+  description: 'The maximum number of records returned (1-200)',
+  typeOptions: {
+    minValue: 1,
+    maxValue: 200,
+  },
+},
+{
+  displayName: 'Order',
+  name: 'order',
+  type: 'options',
+  required: false,
+  displayOptions: {
+    show: {
+      resource: ['accounts'],
+      operation: ['getAccountEffects'],
+    },
+  },
+  options: [
+    {
+      name: 'Ascending',
+      value: 'asc',
+    },
+    {
+      name: 'Descending',
+      value: 'desc',
+    },
+  ],
+  default: 'asc',
+  description: 'The order in which to return rows',
+},
+{
+  displayName: 'Asset Code',
+  name: 'asset_code',
+  type: 'string',
+  displayOptions: {
+    show: {
+      resource: ['assets'],
+      operation: ['getAssets', 'getAsset', 'createAsset'],
+    },
+  },
+  default: '',
+  description: 'The asset code to filter by',
+},
+{
+  displayName: 'Asset Issuer',
+  name: 'asset_issuer',
+  type: 'string',
+  displayOptions: {
+    show: {
+      resource: ['assets'],
+      operation: ['getAssets', 'getAsset'],
+    },
+  },
+  default: '',
+  description: 'The asset issuer to filter by',
+},
+{
+  displayName: 'Asset Issuer',
+  name: 'asset_issuer',
+  type: 'string',
+  required: true,
+  displayOptions: {
+    show: {
+      resource: ['assets'],
+      operation: ['getAsset'],
+    },
+  },
+  default: '',
+  description: 'The asset issuer (required for specific asset)',
+},
+{
+  displayName: 'Cursor',
+  name: 'cursor',
+  type: 'string',
+  displayOptions: {
+    show: {
+      resource: ['assets'],
+      operation: ['getAssets'],
+    },
+  },
+  default: '',
+  description: 'A paging token, specifying where to start returning records from',
+},
+{
+  displayName: 'Limit',
+  name: 'limit',
+  type: 'number',
+  displayOptions: {
+    show: {
+      resource: ['assets'],
+      operation: ['getAssets', 'createAsset', 'changeAssetTrust'],
+    },
+  },
+  default: 10,
+  description: 'The number of records to return',
+},
+{
+  displayName: 'Order',
+  name: 'order',
+  type: 'options',
+  displayOptions: {
+    show: {
+      resource: ['assets'],
+      operation: ['getAssets'],
+    },
+  },
+  options: [
+    {
+      name: 'Ascending',
+      value: 'asc',
+    },
+    {
+      name: 'Descending',
+      value: 'desc',
+    },
+  ],
+  default: 'asc',
+  description: 'The order in which to return rows',
+},
+{
+  displayName: 'Authorize Flags',
+  name: 'authorize_flags',
+  type: 'multiOptions',
+  displayOptions: {
+    show: {
+      resource: ['assets'],
+      operation: ['createAsset'],
+    },
+  },
+  options: [
+    {
+      name: 'Authorization Required',
+      value: 'AUTHORIZATION_REQUIRED',
+    },
+    {
+      name: 'Authorization Revocable',
+      value: 'AUTHORIZATION_REVOCABLE',
+    },
+    {
+      name: 'Authorization Immutable',
+      value: 'AUTHORIZATION_IMMUTABLE',
+    },
+  ],
+  default: [],
+  description: 'Authorization flags for the asset',
+},
+{
+  displayName: 'Asset',
+  name: 'asset',
+  type: 'string',
+  required: true,
+  displayOptions: {
+    show: {
+      resource: ['assets'],
+      operation: ['changeAssetTrust'],
+    },
+  },
+  default: '',
+  description: 'The asset code and issuer (format: CODE:ISSUER or native for XLM)',
+},
+{
+  displayName: 'Inflation Destination',
+  name: 'inflation_dest',
+  type: 'string',
+  displayOptions: {
+    show: {
+      resource: ['assets'],
+      operation: ['setAssetOptions'],
+    },
+  },
+  default: '',
+  description: 'Account ID to set as the inflation destination',
+},
+{
+  displayName: 'Clear Flags',
+  name: 'clear_flags',
+  type: 'multiOptions',
+  displayOptions: {
+    show: {
+      resource: ['assets'],
+      operation: ['setAssetOptions'],
+    },
+  },
+  options: [
+    {
+      name: 'Authorization Required',
+      value: 'AUTHORIZATION_REQUIRED',
+    },
+    {
+      name: 'Authorization Revocable',
+      value: 'AUTHORIZATION_REVOCABLE',
+    },
+    {
+      name: 'Authorization Immutable',
+      value: 'AUTHORIZATION_IMMUTABLE',
+    },
+  ],
+  default: [],
+  description: 'Flags to clear on the account',
+},
+{
+  displayName: 'Set Flags',
+  name: 'set_flags',
+  type: 'multiOptions',
+  displayOptions: {
+    show: {
+      resource: ['assets'],
+      operation: ['setAssetOptions'],
+    },
+  },
+  options: [
+    {
+      name: 'Authorization Required',
+      value: 'AUTHORIZATION_REQUIRED',
+    },
+    {
+      name: 'Authorization Revocable',
+      value: 'AUTHORIZATION_REVOCABLE',
+    },
+    {
+      name: 'Authorization Immutable',
+      value: 'AUTHORIZATION_IMMUTABLE',
+    },
+  ],
+  default: [],
+  description: 'Flags to set on the account',
+},
+{
+  displayName: 'Master Weight',
+  name: 'master_weight',
+  type: 'number',
+  displayOptions: {
+    show: {
+      resource: ['assets'],
+      operation: ['setAssetOptions'],
+    },
+  },
+  default: 1,
+  description: 'The master key weight',
+},
+{
+  displayName: 'Contract Address',
+  name: 'contract_address',
+  type: 'string',
+  required: true,
+  displayOptions: {
+    show: {
+      resource: ['sorobanContracts'],
+      operation: ['invokeContract'],
+    },
+  },
+  default: '',
+  description: 'The contract address to invoke',
+},
+{
+  displayName: 'Function Name',
+  name: 'function_name',
+  type: 'string',
+  required: true,
+  displayOptions: {
+    show: {
+      resource: ['sorobanContracts'],
+      operation: ['invokeContract'],
+    },
+  },
+  default: '',
+  description: 'The contract function name to invoke',
+},
+{
+  displayName: 'Parameters',
+  name: 'parameters',
+  type: 'json',
+  displayOptions: {
+    show: {
+      resource: ['sorobanContracts'],
+      operation: ['invokeContract'],
+    },
+  },
+  default: '[]',
+  description: 'Function parameters as JSON array',
+},
+{
+  displayName: 'Source Account',
+  name: 'source_account',
+  type: 'string',
+  required: true,
+  displayOptions: {
+    show: {
+      resource: ['sorobanContracts'],
+      operation: ['invokeContract'],
+    },
+  },
+  default: '',
+  description: 'Source account for the transaction',
+},
+{
+  displayName: 'Transaction',
+  name: 'transaction',
+  type: 'json',
+  required: true,
+  displayOptions: {
+    show: {
+      resource: ['sorobanContracts'],
+      operation: ['simulateTransaction'],
+    },
+  },
+  default: '{}',
+  description: 'Transaction to simulate as JSON',
+},
+{
+  displayName: 'Contract ID',
+  name: 'contract_id',
+  type: 'string',
+  required: true,
+  displayOptions: {
+    show: {
+      resource: ['sorobanContracts'],
+      operation: ['getContract'],
+    },
+  },
+  default: '',
+  description: 'The contract ID to retrieve',
+},
+{
+  displayName: 'Contract WASM',
+  name: 'contract_wasm',
+  type: 'string',
+  required: true,
+  displayOptions: {
+    show: {
+      resource: ['sorobanContracts'],
+      operation: ['deployContract'],
+    },
+  },
+  default: '',
+  description: 'Contract WebAssembly code (hex encoded)',
+},
+{
+  displayName: 'Constructor Arguments',
+  name: 'constructor_args',
+  type: 'json',
+  displayOptions: {
+    show: {
+      resource: ['sorobanContracts'],
+      operation: ['deployContract'],
+    },
+  },
+  default: '[]',
+  description: 'Constructor arguments as JSON array',
+},
+{
+  displayName: 'Contract Address',
+  name: 'contract_address',
+  type: 'string',
+  required: true,
+  displayOptions: {
+    show: {
+      resource: ['sorobanContracts'],
+      operation: ['getContractData'],
+    },
+  },
+  default: '',
+  description: 'The contract address',
+},
+{
+  displayName: 'Key',
+  name: 'key',
+  type: 'string',
+  required: true,
+  displayOptions: {
+    show: {
+      resource: ['sorobanContracts'],
+      operation: ['getContractData'],
+    },
+  },
+  default: '',
+  description: 'The contract data key',
+},
+{
+  displayName: 'Durability',
+  name: 'durability',
+  type: 'options',
+  displayOptions: {
+    show: {
+      resource: ['sorobanContracts'],
+      operation: ['getContractData'],
+    },
+  },
+  options: [
+    {
+      name: 'Temporary',
+      value: 'temporary',
+    },
+    {
+      name: 'Persistent',
+      value: 'persistent',
+    },
+  ],
+  default: 'persistent',
+  description: 'The durability of the contract data',
+},
+{
+  displayName: 'Keys',
+  name: 'keys',
+  type: 'json',
+  required: true,
+  displayOptions: {
+    show: {
+      resource: ['sorobanContracts'],
+      operation: ['getLedgerEntries'],
+    },
+  },
+  default: '[]',
+  description: 'Array of ledger entry keys',
+},
+    ],
+  };
 
-	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
-		// Log licensing notice once per node load
-		logLicensingNotice();
+  async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+    const items = this.getInputData();
+    const resource = this.getNodeParameter('resource', 0) as string;
 
-		const items = this.getInputData();
-		const returnData: INodeExecutionData[] = [];
+    switch (resource) {
+      case 'accounts':
+        return [await executeAccountsOperations.call(this, items)];
+      case 'unknown':
+        return [await executeunknownOperations.call(this, items)];
+      case 'unknown':
+        return [await executeunknownOperations.call(this, items)];
+      case 'unknown':
+        return [await executeunknownOperations.call(this, items)];
+      case 'assets':
+        return [await executeAssetsOperations.call(this, items)];
+      case 'sorobanContracts':
+        return [await executeSorobanContractsOperations.call(this, items)];
+      default:
+        throw new NodeOperationError(this.getNode(), `The resource "${resource}" is not supported`);
+    }
+  }
+}
 
-		const credentials = await this.getCredentials('stellarNetwork');
-		const network = credentials.network as NetworkType;
-		const customHorizonUrl = credentials.customHorizonUrl as string | undefined;
-		const customNetworkPassphrase = credentials.customNetworkPassphrase as string | undefined;
-		const secretKey = credentials.secretKey as string | undefined;
-		const sorobanRpcUrl = credentials.sorobanRpcUrl as string | undefined;
+// ============================================================
+// Resource Handler Functions
+// ============================================================
 
-		const horizonUrl = getHorizonUrl(network, customHorizonUrl);
-		const networkPassphrase = getNetworkPassphrase(network, customNetworkPassphrase);
-		const server = new StellarSdk.Horizon.Server(horizonUrl);
+async function executeAccountsOperations(
+  this: IExecuteFunctions,
+  items: INodeExecutionData[],
+): Promise<INodeExecutionData[]> {
+  const returnData: INodeExecutionData[] = [];
+  const operation = this.getNodeParameter('operation', 0) as string;
+  const credentials = await this.getCredentials('stellarApi') as any;
 
-		let keypair: StellarSdk.Keypair | undefined;
-		if (secretKey) {
-			keypair = StellarSdk.Keypair.fromSecret(secretKey);
-		}
+  for (let i = 0; i < items.length; i++) {
+    try {
+      let result: any;
+      const baseUrl = credentials.baseUrl || 'https://horizon.stellar.org';
 
-		for (let i = 0; i < items.length; i++) {
-			try {
-				const resource = this.getNodeParameter('resource', i) as string;
-				const operation = this.getNodeParameter('operation', i) as string;
-				let result: unknown;
+      switch (operation) {
+        case 'getAccount': {
+          const accountId = this.getNodeParameter('accountId', i) as string;
+          const options: any = {
+            method: 'GET',
+            url: `${baseUrl}/accounts/${accountId}`,
+            headers: {
+              'X-Client-Name': 'n8n-stellar-node',
+            },
+            json: true,
+          };
 
-				// Account operations
-				if (resource === 'account') {
-					if (operation === 'generateKeypair') {
-						const newKeypair = StellarSdk.Keypair.random();
-						result = {
-							publicKey: newKeypair.publicKey(),
-							secretKey: newKeypair.secret(),
-						};
-					} else if (operation === 'getInfo') {
-						const accountId = this.getNodeParameter('accountId', i) as string;
-						const account = await server.loadAccount(accountId);
-						result = {
-							id: account.id,
-							accountId: account.account_id,
-							sequence: account.sequence,
-							balances: account.balances,
-							subentryCount: account.subentry_count,
-							thresholds: account.thresholds,
-							signers: account.signers,
-							data: account.data,
-							flags: account.flags,
-						};
-					} else if (operation === 'fundTestnet') {
-						const accountId = this.getNodeParameter('accountId', i) as string;
-						const friendbotUrl = FRIENDBOT_URLS[network];
-						if (!friendbotUrl) {
-							throw new Error('Friendbot only available on testnet and futurenet');
-						}
-						const response = await axios.get(`${friendbotUrl}?addr=${accountId}`);
-						result = response.data as object;
-					} else if (operation === 'createAccount') {
-						if (!keypair) throw new Error('Secret key required for creating accounts');
-						const destination = this.getNodeParameter('destination', i) as string;
-						const amount = this.getNodeParameter('amount', i) as string;
+          if (credentials.apiKey) {
+            options.headers['Authorization'] = `Bearer ${credentials.apiKey}`;
+          }
 
-						const sourceAccount = await server.loadAccount(keypair.publicKey());
-						const transaction = new StellarSdk.TransactionBuilder(sourceAccount, {
-							fee: String(DEFAULT_SETTINGS.baseFee),
-							networkPassphrase,
-						})
-							.addOperation(StellarSdk.Operation.createAccount({ destination, startingBalance: amount }))
-							.setTimeout(DEFAULT_SETTINGS.timeout)
-							.build();
+          result = await this.helpers.httpRequest(options) as any;
+          break;
+        }
 
-						transaction.sign(keypair);
-						result = await server.submitTransaction(transaction);
-					} else if (operation === 'mergeAccount') {
-						if (!keypair) throw new Error('Secret key required for merging accounts');
-						const destination = this.getNodeParameter('destination', i) as string;
+        case 'getAccounts': {
+          const queryParams: any = {};
+          const cursor = this.getNodeParameter('cursor', i, '') as string;
+          const limit = this.getNodeParameter('limit', i, 10) as number;
+          const order = this.getNodeParameter('order', i, 'asc') as string;
 
-						const sourceAccount = await server.loadAccount(keypair.publicKey());
-						const transaction = new StellarSdk.TransactionBuilder(sourceAccount, {
-							fee: String(DEFAULT_SETTINGS.baseFee),
-							networkPassphrase,
-						})
-							.addOperation(StellarSdk.Operation.accountMerge({ destination }))
-							.setTimeout(DEFAULT_SETTINGS.timeout)
-							.build();
+          if (cursor) queryParams.cursor = cursor;
+          if (limit) queryParams.limit = limit;
+          if (order) queryParams.order = order;
 
-						transaction.sign(keypair);
-						result = await server.submitTransaction(transaction);
-					} else if (operation === 'setData') {
-						if (!keypair) throw new Error('Secret key required for setting data');
-						const dataName = this.getNodeParameter('dataName', i) as string;
-						const dataValue = this.getNodeParameter('dataValue', i) as string;
+          const queryString = new URLSearchParams(queryParams).toString();
+          const url = queryString ? `${baseUrl}/accounts?${queryString}` : `${baseUrl}/accounts`;
 
-						const sourceAccount = await server.loadAccount(keypair.publicKey());
-						const transaction = new StellarSdk.TransactionBuilder(sourceAccount, {
-							fee: String(DEFAULT_SETTINGS.baseFee),
-							networkPassphrase,
-						})
-							.addOperation(StellarSdk.Operation.manageData({
-								name: dataName,
-								value: dataValue || null,
-							}))
-							.setTimeout(DEFAULT_SETTINGS.timeout)
-							.build();
+          const options: any = {
+            method: 'GET',
+            url,
+            headers: {
+              'X-Client-Name': 'n8n-stellar-node',
+            },
+            json: true,
+          };
 
-						transaction.sign(keypair);
-						result = await server.submitTransaction(transaction);
-					} else if (operation === 'setOptions') {
-						if (!keypair) throw new Error('Secret key required for setting options');
-						const homeDomain = this.getNodeParameter('homeDomain', i, '') as string;
-						const inflationDest = this.getNodeParameter('inflationDest', i, '') as string;
+          if (credentials.apiKey) {
+            options.headers['Authorization'] = `Bearer ${credentials.apiKey}`;
+          }
 
-						const sourceAccount = await server.loadAccount(keypair.publicKey());
-						const builder = new StellarSdk.TransactionBuilder(sourceAccount, {
-							fee: String(DEFAULT_SETTINGS.baseFee),
-							networkPassphrase,
-						});
+          result = await this.helpers.httpRequest(options) as any;
+          break;
+        }
 
-						if (homeDomain) {
-							builder.addOperation(StellarSdk.Operation.setOptions({ homeDomain }));
-						}
-						if (inflationDest) {
-							builder.addOperation(StellarSdk.Operation.setOptions({ inflationDest }));
-						}
-						if (!homeDomain && !inflationDest) {
-							builder.addOperation(StellarSdk.Operation.setOptions({}));
-						}
+        case 'getAccountTransactions': {
+          const accountId = this.getNodeParameter('accountId', i) as string;
+          const queryParams: any = {};
+          const cursor = this.getNodeParameter('cursor', i, '') as string;
+          const limit = this.getNodeParameter('limit', i, 10) as number;
+          const order = this.getNodeParameter('order', i, 'asc') as string;
 
-						const transaction = builder.setTimeout(DEFAULT_SETTINGS.timeout).build();
-						transaction.sign(keypair);
-						result = await server.submitTransaction(transaction);
-					} else {
-						throw new Error(`Unknown account operation: ${operation}`);
-					}
-				}
+          if (cursor) queryParams.cursor = cursor;
+          if (limit) queryParams.limit = limit;
+          if (order) queryParams.order = order;
 
-				// Payment operations
-				else if (resource === 'payment') {
-					if (operation === 'sendPayment') {
-						if (!keypair) throw new Error('Secret key required for payments');
-						const destination = this.getNodeParameter('destination', i) as string;
-						const amount = this.getNodeParameter('amount', i) as string;
-						const assetCode = this.getNodeParameter('assetCode', i) as string;
-						const assetIssuer = this.getNodeParameter('assetIssuer', i, '') as string;
+          const queryString = new URLSearchParams(queryParams).toString();
+          const url = queryString 
+            ? `${baseUrl}/accounts/${accountId}/transactions?${queryString}` 
+            : `${baseUrl}/accounts/${accountId}/transactions`;
 
-						const asset = assetCode === 'XLM' || !assetIssuer
-							? StellarSdk.Asset.native()
-							: new StellarSdk.Asset(assetCode, assetIssuer);
+          const options: any = {
+            method: 'GET',
+            url,
+            headers: {
+              'X-Client-Name': 'n8n-stellar-node',
+            },
+            json: true,
+          };
 
-						const sourceAccount = await server.loadAccount(keypair.publicKey());
-						const transaction = new StellarSdk.TransactionBuilder(sourceAccount, {
-							fee: String(DEFAULT_SETTINGS.baseFee),
-							networkPassphrase,
-						})
-							.addOperation(StellarSdk.Operation.payment({ destination, asset, amount }))
-							.setTimeout(DEFAULT_SETTINGS.timeout)
-							.build();
+          if (credentials.apiKey) {
+            options.headers['Authorization'] = `Bearer ${credentials.apiKey}`;
+          }
 
-						transaction.sign(keypair);
-						result = await server.submitTransaction(transaction);
-					} else if (operation === 'pathPayment') {
-						if (!keypair) throw new Error('Secret key required for path payments');
-						const destination = this.getNodeParameter('destination', i) as string;
-						const amount = this.getNodeParameter('amount', i) as string;
-						const assetCode = this.getNodeParameter('assetCode', i) as string;
-						const assetIssuer = this.getNodeParameter('assetIssuer', i, '') as string;
+          result = await this.helpers.httpRequest(options) as any;
+          break;
+        }
 
-						const destAsset = assetCode === 'XLM' || !assetIssuer
-							? StellarSdk.Asset.native()
-							: new StellarSdk.Asset(assetCode, assetIssuer);
+        case 'getAccountOperations': {
+          const accountId = this.getNodeParameter('accountId', i) as string;
+          const queryParams: any = {};
+          const cursor = this.getNodeParameter('cursor', i, '') as string;
+          const limit = this.getNodeParameter('limit', i, 10) as number;
+          const order = this.getNodeParameter('order', i, 'asc') as string;
 
-						const sourceAccount = await server.loadAccount(keypair.publicKey());
-						const transaction = new StellarSdk.TransactionBuilder(sourceAccount, {
-							fee: String(DEFAULT_SETTINGS.baseFee),
-							networkPassphrase,
-						})
-							.addOperation(StellarSdk.Operation.pathPaymentStrictReceive({
-								sendAsset: StellarSdk.Asset.native(),
-								sendMax: amount,
-								destination,
-								destAsset,
-								destAmount: amount,
-								path: [],
-							}))
-							.setTimeout(DEFAULT_SETTINGS.timeout)
-							.build();
+          if (cursor) queryParams.cursor = cursor;
+          if (limit) queryParams.limit = limit;
+          if (order) queryParams.order = order;
 
-						transaction.sign(keypair);
-						result = await server.submitTransaction(transaction);
-					} else if (operation === 'createClaimableBalance') {
-						if (!keypair) throw new Error('Secret key required');
-						const amount = this.getNodeParameter('amount', i) as string;
-						const assetCode = this.getNodeParameter('assetCode', i) as string;
-						const assetIssuer = this.getNodeParameter('assetIssuer', i, '') as string;
-						const claimantsJson = this.getNodeParameter('claimants', i) as string;
+          const queryString = new URLSearchParams(queryParams).toString();
+          const url = queryString 
+            ? `${baseUrl}/accounts/${accountId}/operations?${queryString}` 
+            : `${baseUrl}/accounts/${accountId}/operations`;
 
-						const asset = assetCode === 'XLM' || !assetIssuer
-							? StellarSdk.Asset.native()
-							: new StellarSdk.Asset(assetCode, assetIssuer);
+          const options: any = {
+            method: 'GET',
+            url,
+            headers: {
+              'X-Client-Name': 'n8n-stellar-node',
+            },
+            json: true,
+          };
 
-						const claimantsData = JSON.parse(claimantsJson) as Array<{ destination: string }>;
-						const claimants = claimantsData.map((c) =>
-							new StellarSdk.Claimant(c.destination, StellarSdk.Claimant.predicateUnconditional())
-						);
+          if (credentials.apiKey) {
+            options.headers['Authorization'] = `Bearer ${credentials.apiKey}`;
+          }
 
-						const sourceAccount = await server.loadAccount(keypair.publicKey());
-						const transaction = new StellarSdk.TransactionBuilder(sourceAccount, {
-							fee: String(DEFAULT_SETTINGS.baseFee),
-							networkPassphrase,
-						})
-							.addOperation(StellarSdk.Operation.createClaimableBalance({ asset, amount, claimants }))
-							.setTimeout(DEFAULT_SETTINGS.timeout)
-							.build();
+          result = await this.helpers.httpRequest(options) as any;
+          break;
+        }
 
-						transaction.sign(keypair);
-						result = await server.submitTransaction(transaction);
-					} else if (operation === 'claimBalance') {
-						if (!keypair) throw new Error('Secret key required');
-						const balanceId = this.getNodeParameter('balanceId', i) as string;
+        case 'getAccountPayments': {
+          const accountId = this.getNodeParameter('accountId', i) as string;
+          const queryParams: any = {};
+          const cursor = this.getNodeParameter('cursor', i, '') as string;
+          const limit = this.getNodeParameter('limit', i, 10) as number;
+          const order = this.getNodeParameter('order', i, 'asc') as string;
 
-						const sourceAccount = await server.loadAccount(keypair.publicKey());
-						const transaction = new StellarSdk.TransactionBuilder(sourceAccount, {
-							fee: String(DEFAULT_SETTINGS.baseFee),
-							networkPassphrase,
-						})
-							.addOperation(StellarSdk.Operation.claimClaimableBalance({ balanceId }))
-							.setTimeout(DEFAULT_SETTINGS.timeout)
-							.build();
+          if (cursor) queryParams.cursor = cursor;
+          if (limit) queryParams.limit = limit;
+          if (order) queryParams.order = order;
 
-						transaction.sign(keypair);
-						result = await server.submitTransaction(transaction);
-					} else {
-						throw new Error(`Unknown payment operation: ${operation}`);
-					}
-				}
+          const queryString = new URLSearchParams(queryParams).toString();
+          const url = queryString 
+            ? `${baseUrl}/accounts/${accountId}/payments?${queryString}` 
+            : `${baseUrl}/accounts/${accountId}/payments`;
 
-				// Asset operations
-				else if (resource === 'asset') {
-					if (operation === 'changeTrust') {
-						if (!keypair) throw new Error('Secret key required for trustlines');
-						const assetCode = this.getNodeParameter('assetCode', i) as string;
-						const assetIssuer = this.getNodeParameter('assetIssuer', i) as string;
-						const trustLimit = this.getNodeParameter('trustLimit', i, '') as string;
+          const options: any = {
+            method: 'GET',
+            url,
+            headers: {
+              'X-Client-Name': 'n8n-stellar-node',
+            },
+            json: true,
+          };
 
-						if (!assetIssuer) throw new Error('Asset issuer required for non-native assets');
-						const asset = new StellarSdk.Asset(assetCode, assetIssuer);
+          if (credentials.apiKey) {
+            options.headers['Authorization'] = `Bearer ${credentials.apiKey}`;
+          }
 
-						const sourceAccount = await server.loadAccount(keypair.publicKey());
-						const builder = new StellarSdk.TransactionBuilder(sourceAccount, {
-							fee: String(DEFAULT_SETTINGS.baseFee),
-							networkPassphrase,
-						});
+          result = await this.helpers.httpRequest(options) as any;
+          break;
+        }
 
-						if (trustLimit) {
-							builder.addOperation(StellarSdk.Operation.changeTrust({ asset, limit: trustLimit }));
-						} else {
-							builder.addOperation(StellarSdk.Operation.changeTrust({ asset }));
-						}
+        case 'getAccountEffects': {
+          const accountId = this.getNodeParameter('accountId', i) as string;
+          const queryParams: any = {};
+          const cursor = this.getNodeParameter('cursor', i, '') as string;
+          const limit = this.getNodeParameter('limit', i, 10) as number;
+          const order = this.getNodeParameter('order', i, 'asc') as string;
 
-						const transaction = builder.setTimeout(DEFAULT_SETTINGS.timeout).build();
-						transaction.sign(keypair);
-						result = await server.submitTransaction(transaction);
-					} else if (operation === 'getAssetInfo') {
-						const assetCode = this.getNodeParameter('assetCode', i) as string;
-						const assetIssuer = this.getNodeParameter('assetIssuer', i, '') as string;
+          if (cursor) queryParams.cursor = cursor;
+          if (limit) queryParams.limit = limit;
+          if (order) queryParams.order = order;
 
-						if (assetCode === 'XLM' || !assetIssuer) {
-							result = { type: 'native', code: 'XLM', issuer: null };
-						} else {
-							const assets = await server.assets().forCode(assetCode).forIssuer(assetIssuer).call();
-							result = assets.records.length > 0 ? assets.records[0] : { error: 'Asset not found' };
-						}
-					} else if (operation === 'issueAsset') {
-						if (!keypair) throw new Error('Secret key required');
-						const assetCode = this.getNodeParameter('assetCode', i) as string;
-						const destination = this.getNodeParameter('destination', i) as string;
-						const amount = this.getNodeParameter('amount', i) as string;
+          const queryString = new URLSearchParams(queryParams).toString();
+          const url = queryString 
+            ? `${baseUrl}/accounts/${accountId}/effects?${queryString}` 
+            : `${baseUrl}/accounts/${accountId}/effects`;
 
-						const asset = new StellarSdk.Asset(assetCode, keypair.publicKey());
+          const options: any = {
+            method: 'GET',
+            url,
+            headers: {
+              'X-Client-Name': 'n8n-stellar-node',
+            },
+            json: true,
+          };
 
-						const sourceAccount = await server.loadAccount(keypair.publicKey());
-						const transaction = new StellarSdk.TransactionBuilder(sourceAccount, {
-							fee: String(DEFAULT_SETTINGS.baseFee),
-							networkPassphrase,
-						})
-							.addOperation(StellarSdk.Operation.payment({ destination, asset, amount }))
-							.setTimeout(DEFAULT_SETTINGS.timeout)
-							.build();
+          if (credentials.apiKey) {
+            options.headers['Authorization'] = `Bearer ${credentials.apiKey}`;
+          }
 
-						transaction.sign(keypair);
-						result = await server.submitTransaction(transaction);
-					} else {
-						throw new Error(`Unknown asset operation: ${operation}`);
-					}
-				}
+          result = await this.helpers.httpRequest(options) as any;
+          break;
+        }
 
-				// DEX operations
-				else if (resource === 'dex') {
-					if (operation === 'getOrderbook') {
-						const sellingCode = this.getNodeParameter('sellingAssetCode', i) as string;
-						const sellingIssuer = this.getNodeParameter('sellingAssetIssuer', i, '') as string;
-						const buyingCode = this.getNodeParameter('buyingAssetCode', i) as string;
-						const buyingIssuer = this.getNodeParameter('buyingAssetIssuer', i, '') as string;
+        default:
+          throw new NodeOperationError(this.getNode(), `Unknown operation: ${operation}`);
+      }
 
-						const selling = sellingCode === 'XLM' || !sellingIssuer
-							? StellarSdk.Asset.native()
-							: new StellarSdk.Asset(sellingCode, sellingIssuer);
-						const buying = buyingCode === 'XLM' || !buyingIssuer
-							? StellarSdk.Asset.native()
-							: new StellarSdk.Asset(buyingCode, buyingIssuer);
+      returnData.push({ json: result, pairedItem: { item: i } });
+    } catch (error: any) {
+      if (this.continueOnFail()) {
+        returnData.push({ 
+          json: { error: error.message }, 
+          pairedItem: { item: i } 
+        });
+      } else {
+        if (error.httpCode) {
+          throw new NodeApiError(this.getNode(), error);
+        }
+        throw new NodeOperationError(this.getNode(), error.message);
+      }
+    }
+  }
 
-						result = await server.orderbook(selling, buying).call();
-					} else if (operation === 'createSellOffer') {
-						if (!keypair) throw new Error('Secret key required');
-						const sellingCode = this.getNodeParameter('sellingAssetCode', i) as string;
-						const sellingIssuer = this.getNodeParameter('sellingAssetIssuer', i, '') as string;
-						const buyingCode = this.getNodeParameter('buyingAssetCode', i) as string;
-						const buyingIssuer = this.getNodeParameter('buyingAssetIssuer', i, '') as string;
-						const amount = this.getNodeParameter('amount', i) as string;
-						const price = this.getNodeParameter('price', i) as string;
+  return returnData;
+}
 
-						const selling = sellingCode === 'XLM' || !sellingIssuer
-							? StellarSdk.Asset.native()
-							: new StellarSdk.Asset(sellingCode, sellingIssuer);
-						const buying = buyingCode === 'XLM' || !buyingIssuer
-							? StellarSdk.Asset.native()
-							: new StellarSdk.Asset(buyingCode, buyingIssuer);
+// PARSE ERROR for unknown — manual fix needed
+// Raw: // No additional imports
 
-						const sourceAccount = await server.loadAccount(keypair.publicKey());
-						const transaction = new StellarSdk.TransactionBuilder(sourceAccount, {
-							fee: String(DEFAULT_SETTINGS.baseFee),
-							networkPassphrase,
-						})
-							.addOperation(StellarSdk.Operation.manageSellOffer({ selling, buying, amount, price }))
-							.setTimeout(DEFAULT_SETTINGS.timeout)
-							.build();
+{
+  displayName: 'Operation',
+  name: 'operation',
+  type: 'options',
+  noDataExpression: true,
+  displayOptions: {
+    show: {
+      resource: ['payments'],
+    },
+  },
+  options: [
+    {
+      name: 'Submit Payment',
+      value: 'submitPayment',
+      description: 'Submi
 
-						transaction.sign(keypair);
-						result = await server.submitTransaction(transaction);
-					} else if (operation === 'createBuyOffer') {
-						if (!keypair) throw new Error('Secret key required');
-						const sellingCode = this.getNodeParameter('sellingAssetCode', i) as string;
-						const sellingIssuer = this.getNodeParameter('sellingAssetIssuer', i, '') as string;
-						const buyingCode = this.getNodeParameter('buyingAssetCode', i) as string;
-						const buyingIssuer = this.getNodeParameter('buyingAssetIssuer', i, '') as string;
-						const amount = this.getNodeParameter('amount', i) as string;
-						const price = this.getNodeParameter('price', i) as string;
+// PARSE ERROR for unknown — manual fix needed
+// Raw: // No additional imports
 
-						const selling = sellingCode === 'XLM' || !sellingIssuer
-							? StellarSdk.Asset.native()
-							: new StellarSdk.Asset(sellingCode, sellingIssuer);
-						const buying = buyingCode === 'XLM' || !buyingIssuer
-							? StellarSdk.Asset.native()
-							: new StellarSdk.Asset(buyingCode, buyingIssuer);
+{
+  displayName: 'Operation',
+  name: 'operation',
+  type: 'options',
+  noDataExpression: true,
+  displayOptions: {
+    show: {
+      resource: ['tradingOffers'],
+    },
+  },
+  options: [
+    {
+      name: 'Get Offers',
+      value: 'getOffers',
+      description: 'Get list
 
-						const sourceAccount = await server.loadAccount(keypair.publicKey());
-						const transaction = new StellarSdk.TransactionBuilder(sourceAccount, {
-							fee: String(DEFAULT_SETTINGS.baseFee),
-							networkPassphrase,
-						})
-							.addOperation(StellarSdk.Operation.manageBuyOffer({ selling, buying, buyAmount: amount, price }))
-							.setTimeout(DEFAULT_SETTINGS.timeout)
-							.build();
+// PARSE ERROR for unknown — manual fix needed
+// Raw: // No additional imports
 
-						transaction.sign(keypair);
-						result = await server.submitTransaction(transaction);
-					} else if (operation === 'cancelOffer') {
-						if (!keypair) throw new Error('Secret key required');
-						const offerId = this.getNodeParameter('offerId', i) as string;
+{
+  displayName: 'Operation',
+  name: 'operation',
+  type: 'options',
+  noDataExpression: true,
+  displayOptions: {
+    show: {
+      resource: ['orderbook'],
+    },
+  },
+  options: [
+    {
+      name: 'Get Orderbook',
+      value: 'getOrderbook',
+      description: 'Get or
 
-						const sourceAccount = await server.loadAccount(keypair.publicKey());
-						const transaction = new StellarSdk.TransactionBuilder(sourceAccount, {
-							fee: String(DEFAULT_SETTINGS.baseFee),
-							networkPassphrase,
-						})
-							.addOperation(StellarSdk.Operation.manageSellOffer({
-								selling: StellarSdk.Asset.native(),
-								buying: StellarSdk.Asset.native(),
-								amount: '0',
-								price: '1',
-								offerId,
-							}))
-							.setTimeout(DEFAULT_SETTINGS.timeout)
-							.build();
+async function executeAssetsOperations(
+  this: IExecuteFunctions,
+  items: INodeExecutionData[],
+): Promise<INodeExecutionData[]> {
+  const returnData: INodeExecutionData[] = [];
+  const operation = this.getNodeParameter('operation', 0) as string;
+  const credentials = await this.getCredentials('stellarApi') as any;
 
-						transaction.sign(keypair);
-						result = await server.submitTransaction(transaction);
-					} else if (operation === 'listOffers') {
-						if (!keypair) throw new Error('Secret key required to list your offers');
-						const offers = await server.offers().forAccount(keypair.publicKey()).call();
-						result = { offers: offers.records };
-					} else if (operation === 'getTrades') {
-						const assetCode = this.getNodeParameter('assetCode', i, 'XLM') as string;
-						const assetIssuer = this.getNodeParameter('assetIssuer', i, '') as string;
+  for (let i = 0; i < items.length; i++) {
+    try {
+      let result: any;
 
-						let tradesCall = server.trades();
-						if (assetCode !== 'XLM' && assetIssuer) {
-							const asset = new StellarSdk.Asset(assetCode, assetIssuer);
-							tradesCall = tradesCall.forAssetPair(StellarSdk.Asset.native(), asset);
-						}
-						const trades = await tradesCall.limit(50).order('desc').call();
-						result = { trades: trades.records };
-					} else {
-						throw new Error(`Unknown DEX operation: ${operation}`);
-					}
-				}
+      switch (operation) {
+        case 'getAssets': {
+          const queryParams: any = {};
+          
+          const assetCode = this.getNodeParameter('asset_code', i, '') as string;
+          const assetIssuer = this.getNodeParameter('asset_issuer', i, '') as string;
+          const cursor = this.getNodeParameter('cursor', i, '') as string;
+          const limit = this.getNodeParameter('limit', i, 10) as number;
+          const order = this.getNodeParameter('order', i, 'asc') as string;
 
-				// Transaction operations
-				else if (resource === 'transaction') {
-					if (operation === 'getTransaction') {
-						const txHash = this.getNodeParameter('transactionHash', i) as string;
-						result = await server.transactions().transaction(txHash).call();
-					} else if (operation === 'signXdr') {
-						if (!keypair) throw new Error('Secret key required for signing');
-						const xdr = this.getNodeParameter('xdr', i) as string;
+          if (assetCode) queryParams.asset_code = assetCode;
+          if (assetIssuer) queryParams.asset_issuer = assetIssuer;
+          if (cursor) queryParams.cursor = cursor;
+          if (limit) queryParams.limit = limit;
+          if (order) queryParams.order = order;
 
-						const transaction = StellarSdk.TransactionBuilder.fromXDR(xdr, networkPassphrase);
-						transaction.sign(keypair);
-						result = {
-							signedXdr: transaction.toEnvelope().toXDR('base64'),
-							signatures: transaction.signatures.length,
-						};
-					} else if (operation === 'submitXdr') {
-						const xdr = this.getNodeParameter('xdr', i) as string;
-						const transaction = StellarSdk.TransactionBuilder.fromXDR(xdr, networkPassphrase);
-						result = await server.submitTransaction(transaction);
-					} else {
-						throw new Error(`Unknown transaction operation: ${operation}`);
-					}
-				}
+          const options: any = {
+            method: 'GET',
+            url: `${credentials.baseUrl}/assets`,
+            headers: {
+              'Authorization': `Bearer ${credentials.apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            qs: queryParams,
+            json: true,
+          };
 
-				// Ledger operations
-				else if (resource === 'ledger') {
-					if (operation === 'getLatest') {
-						const ledgers = await server.ledgers().order('desc').limit(1).call();
-						result = ledgers.records[0];
-					} else if (operation === 'getBySequence') {
-						const sequence = this.getNodeParameter('ledgerSequence', i) as number;
-						result = await server.ledgers().ledger(sequence).call();
-					} else if (operation === 'getFeeStats') {
-						result = await server.feeStats();
-					} else {
-						throw new Error(`Unknown ledger operation: ${operation}`);
-					}
-				}
+          result = await this.helpers.httpRequest(options) as any;
+          break;
+        }
 
-				// Soroban operations
-				else if (resource === 'soroban') {
-					const rpcUrl = sorobanRpcUrl || getSorobanRpcUrl(network);
-					const sorobanServer = new StellarSdk.SorobanRpc.Server(rpcUrl);
+        case 'getAsset': {
+          const assetCode = this.getNodeParameter('asset_code', i) as string;
+          const assetIssuer = this.getNodeParameter('asset_issuer', i) as string;
 
-					if (operation === 'getHealth') {
-						result = await sorobanServer.getHealth();
-					} else if (operation === 'simulateTransaction' || operation === 'invokeContract') {
-						if (!keypair) throw new Error('Secret key required for contract operations');
-						const contractId = this.getNodeParameter('contractId', i) as string;
-						const functionName = this.getNodeParameter('functionName', i) as string;
-						const functionArgs = this.getNodeParameter('functionArgs', i) as string;
+          if (!assetCode || !assetIssuer) {
+            throw new NodeOperationError(this.getNode(), 'Asset code and issuer are required for getting specific asset');
+          }
 
-						const contract = new StellarSdk.Contract(contractId);
-						const args = JSON.parse(functionArgs) as unknown[];
+          const options: any = {
+            method: 'GET',
+            url: `${credentials.baseUrl}/assets/${encodeURIComponent(assetCode)}/${encodeURIComponent(assetIssuer)}`,
+            headers: {
+              'Authorization': `Bearer ${credentials.apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            json: true,
+          };
 
-						const sourceAccount = await sorobanServer.getAccount(keypair.publicKey());
-						const transaction = new StellarSdk.TransactionBuilder(sourceAccount, {
-							fee: String(DEFAULT_SETTINGS.baseFee),
-							networkPassphrase,
-						})
-							.addOperation(contract.call(functionName, ...args.map((arg) => {
-								if (typeof arg === 'string') return StellarSdk.nativeToScVal(arg);
-								if (typeof arg === 'number') return StellarSdk.nativeToScVal(arg, { type: 'i128' });
-								return StellarSdk.nativeToScVal(arg);
-							})))
-							.setTimeout(DEFAULT_SETTINGS.timeout)
-							.build();
+          result = await this.helpers.httpRequest(options) as any;
+          break;
+        }
 
-						const simResult = await sorobanServer.simulateTransaction(transaction);
+        case 'createAsset': {
+          const assetCode = this.getNodeParameter('asset_code', i) as string;
+          const limit = this.getNodeParameter('limit', i, '') as string;
+          const authorizeFlags = this.getNodeParameter('authorize_flags', i, []) as string[];
 
-						if (operation === 'simulateTransaction') {
-							result = simResult;
-						} else {
-							if (StellarSdk.SorobanRpc.Api.isSimulationError(simResult)) {
-								throw new Error(`Simulation failed: ${simResult.error}`);
-							}
-							const preparedTx = StellarSdk.SorobanRpc.assembleTransaction(transaction, simResult).build();
-							preparedTx.sign(keypair);
-							result = await sorobanServer.sendTransaction(preparedTx);
-						}
-					} else {
-						throw new Error(`Unknown soroban operation: ${operation}`);
-					}
-				} else {
-					throw new Error(`Unknown resource: ${resource}`);
-				}
+          if (!assetCode) {
+            throw new NodeOperationError(this.getNode(), 'Asset code is required for creating asset');
+          }
 
-				returnData.push({ json: result as IDataObject });
-			} catch (error) {
-				if (this.continueOnFail()) {
-					const errorMessage = error instanceof Error ? error.message : String(error);
-					returnData.push({ json: { error: errorMessage } });
-					continue;
-				}
-				throw error;
-			}
-		}
+          const transactionData: any = {
+            operations: [
+              {
+                type: 'create_asset',
+                asset_code: assetCode,
+                limit: limit,
+                authorize_flags: authorizeFlags,
+              },
+            ],
+          };
 
-		return [returnData];
-	}
+          const options: any = {
+            method: 'POST',
+            url: `${credentials.baseUrl}/transactions`,
+            headers: {
+              'Authorization': `Bearer ${credentials.apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: transactionData,
+            json: true,
+          };
+
+          result = await this.helpers.httpRequest(options) as any;
+          break;
+        }
+
+        case 'changeAssetTrust': {
+          const asset = this.getNodeParameter('asset', i) as string;
+          const limit = this.getNodeParameter('limit', i, '') as string;
+
+          if (!asset) {
+            throw new NodeOperationError(this.getNode(), 'Asset is required for changing trust');
+          }
+
+          const transactionData: any = {
+            operations: [
+              {
+                type: 'change_trust',
+                asset: asset,
+                limit: limit,
+              },
+            ],
+          };
+
+          const options: any = {
+            method: 'POST',
+            url: `${credentials.baseUrl}/transactions`,
+            headers: {
+              'Authorization': `Bearer ${credentials.apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: transactionData,
+            json: true,
+          };
+
+          result = await this.helpers.httpRequest(options) as any;
+          break;
+        }
+
+        case 'setAssetOptions': {
+          const inflationDest = this.getNodeParameter('inflation_dest', i, '') as string;
+          const clearFlags = this.getNodeParameter('clear_flags', i, []) as string[];
+          const setFlags = this.getNodeParameter('set_flags', i, []) as string[];
+          const masterWeight = this.getNodeParameter('master_weight', i, 1) as number;
+
+          const transactionData: any = {
+            operations: [
+              {
+                type: 'set_options',
+                inflation_dest: inflationDest || undefined,
+                clear_flags: clearFlags.length > 0 ? clearFlags : undefined,
+                set_flags: setFlags.length > 0 ? setFlags : undefined,
+                master_weight: masterWeight,
+              },
+            ],
+          };
+
+          const options: any = {
+            method: 'POST',
+            url: `${credentials.baseUrl}/transactions`,
+            headers: {
+              'Authorization': `Bearer ${credentials.apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: transactionData,
+            json: true,
+          };
+
+          result = await this.helpers.httpRequest(options) as any;
+          break;
+        }
+
+        default:
+          throw new NodeOperationError(this.getNode(), `Unknown operation: ${operation}`);
+      }
+
+      returnData.push({
+        json: result,
+        pairedItem: { item: i },
+      });
+
+    } catch (error: any) {
+      if (this.continueOnFail()) {
+        returnData.push({
+          json: { error: error.message },
+          pairedItem: { item: i },
+        });
+      } else {
+        throw new NodeApiError(this.getNode(), error);
+      }
+    }
+  }
+
+  return returnData;
+}
+
+async function executeSorobanContractsOperations(
+  this: IExecuteFunctions,
+  items: INodeExecutionData[],
+): Promise<INodeExecutionData[]> {
+  const returnData: INodeExecutionData[] = [];
+  const operation = this.getNodeParameter('operation', 0) as string;
+  const credentials = await this.getCredentials('stellarApi') as any;
+
+  for (let i = 0; i < items.length; i++) {
+    try {
+      let result: any;
+
+      switch (operation) {
+        case 'invokeContract': {
+          const contractAddress = this.getNodeParameter('contract_address', i) as string;
+          const functionName = this.getNodeParameter('function_name', i) as string;
+          const parameters = this.getNodeParameter('parameters', i) as string;
+          const sourceAccount = this.getNodeParameter('source_account', i) as string;
+
+          const requestBody = {
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'simulateTransaction',
+            params: {
+              transaction: {
+                sourceAccount,
+                operations: [{
+                  type: 'invokeHostFunction',
+                  hostFunction: {
+                    type: 'invokeContract',
+                    contractAddress,
+                    functionName,
+                    args: JSON.parse(parameters),
+                  },
+                }],
+              },
+            },
+          };
+
+          const options: any = {
+            method: 'POST',
+            url: `${credentials.baseUrl}/soroban/rpc`,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${credentials.apiKey}`,
+            },
+            body: requestBody,
+            json: true,
+          };
+
+          result = await this.helpers.httpRequest(options) as any;
+          break;
+        }
+
+        case 'simulateTransaction': {
+          const transaction = this.getNodeParameter('transaction', i) as string;
+
+          const requestBody = {
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'simulateTransaction',
+            params: {
+              transaction: JSON.parse(transaction),
+            },
+          };
+
+          const options: any = {
+            method: 'POST',
+            url: `${credentials.baseUrl}/soroban/rpc`,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${credentials.apiKey}`,
+            },
+            body: requestBody,
+            json: true,
+          };
+
+          result = await this.helpers.httpRequest(options) as any;
+          break;
+        }
+
+        case 'getContract': {
+          const contractId = this.getNodeParameter('contract_id', i) as string;
+
+          const options: any = {
+            method: 'GET',
+            url: `${credentials.baseUrl}/contracts/${contractId}`,
+            headers: {
+              'Authorization': `Bearer ${credentials.apiKey}`,
+            },
+            json: true,
+          };
+
+          result = await this.helpers.httpRequest(options) as any;
+          break;
+        }
+
+        case 'deployContract': {
+          const contractWasm = this.getNodeParameter('contract_wasm', i) as string;
+          const constructorArgs = this.getNodeParameter('constructor_args', i) as string;
+
+          const requestBody = {
+            operations: [{
+              type: 'createContract',
+              contractDataXDR: contractWasm,
+              constructorArgs: JSON.parse(constructorArgs),
+            }],
+          };
+
+          const options: any = {
+            method: 'POST',
+            url: `${credentials.baseUrl}/transactions`,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${credentials.apiKey}`,
+            },
+            body: requestBody,
+            json: true,
+          };
+
+          result = await this.helpers.httpRequest(options) as any;
+          break;
+        }
+
+        case 'getContractData': {
+          const contractAddress = this.getNodeParameter('contract_address', i) as string;
+          const key = this.getNodeParameter('key', i) as string;
+          const durability = this.getNodeParameter('durability', i) as string;
+
+          const requestBody = {
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'getContractData',
+            params: {
+              contractId: contractAddress,
+              key,
+              durability,
+            },
+          };
+
+          const options: any = {
+            method: 'POST',
+            url: `${credentials.baseUrl}/soroban/rpc`,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${credentials.apiKey}`,
+            },
+            body: requestBody,
+            json: true,
+          };
+
+          result = await this.helpers.httpRequest(options) as any;
+          break;
+        }
+
+        case 'getLedgerEntries': {
+          const keys = this.getNodeParameter('keys', i) as string;
+
+          const requestBody = {
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'getLedgerEntries',
+            params: {
+              keys: JSON.parse(keys),
+            },
+          };
+
+          const options: any = {
+            method: 'POST',
+            url: `${credentials.baseUrl}/soroban/rpc`,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${credentials.apiKey}`,
+            },
+            body: requestBody,
+            json: true,
+          };
+
+          result = await this.helpers.httpRequest(options) as any;
+          break;
+        }
+
+        default:
+          throw new NodeOperationError(this.getNode(), `Unknown operation: ${operation}`);
+      }
+
+      returnData.push({ json: result, pairedItem: { item: i } });
+    } catch (error: any) {
+      if (this.continueOnFail()) {
+        returnData.push({ json: { error: error.message }, pairedItem: { item: i } });
+      } else {
+        throw new NodeApiError(this.getNode(), error);
+      }
+    }
+  }
+
+  return returnData;
 }
