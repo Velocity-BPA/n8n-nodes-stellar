@@ -1,6 +1,6 @@
 # n8n-nodes-stellar
 
-> [Velocity BPA Licensing Notice]
+> **[Velocity BPA Licensing Notice]**
 >
 > This n8n node is licensed under the Business Source License 1.1 (BSL 1.1).
 >
@@ -8,23 +8,25 @@
 >
 > For licensing information, visit https://velobpa.com/licensing or contact licensing@velobpa.com.
 
-A comprehensive n8n community node for Stellar blockchain providing 7 resources and 25+ operations for payments, DEX trading, Soroban smart contracts, and real-time event triggers.
+This n8n community node provides comprehensive integration with the Stellar blockchain network, offering 5 core resources including Accounts, Assets, and SorobanContracts. Build powerful blockchain automation workflows with operations for account management, asset transfers, smart contract interactions, and real-time ledger monitoring.
 
-![n8n](https://img.shields.io/badge/n8n-community--node-blue)
-![Stellar](https://img.shields.io/badge/Stellar-blockchain-black)
+![n8n Community Node](https://img.shields.io/badge/n8n-Community%20Node-blue)
 ![License](https://img.shields.io/badge/license-BSL--1.1-blue)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue)
+![Stellar](https://img.shields.io/badge/Stellar-Blockchain-orange)
+![Horizon API](https://img.shields.io/badge/Horizon-API-purple)
+![Soroban](https://img.shields.io/badge/Soroban-Smart%20Contracts-green)
 
 ## Features
 
-- **Account Management**: Generate keypairs, create/merge accounts, fund testnet, set data/options
-- **Payments**: Send XLM and custom assets, path payments, claimable balances
-- **Asset Operations**: Create trustlines, issue assets, query asset info
-- **DEX Trading**: Orderbook queries, create/cancel offers, view trades
-- **Transaction Handling**: Sign and submit XDR transactions
-- **Ledger Queries**: Get latest ledger, fee statistics, historical data
-- **Soroban Smart Contracts**: Invoke contracts, simulate transactions, health checks
-- **Real-time Triggers**: Stream payments, transactions, operations, effects, ledgers, trades
+- **Account Management** - Create, query, and monitor Stellar accounts with full transaction history
+- **Asset Operations** - Issue, transfer, and manage custom assets on the Stellar network
+- **Smart Contract Integration** - Deploy and interact with Soroban smart contracts seamlessly
+- **Transaction Processing** - Submit payments, trades, and complex multi-operation transactions
+- **Real-time Monitoring** - Stream ledger updates and account changes in real-time
+- **Multi-network Support** - Connect to Mainnet, Testnet, or custom Stellar networks
+- **Secure Authentication** - API key-based authentication with encrypted credential storage
+- **Error Recovery** - Robust error handling with automatic retry mechanisms
 
 ## Installation
 
@@ -32,239 +34,159 @@ A comprehensive n8n community node for Stellar blockchain providing 7 resources 
 
 1. Open n8n
 2. Go to **Settings** → **Community Nodes**
-3. Select **Install**
+3. Click **Install a community node**
 4. Enter `n8n-nodes-stellar`
 5. Click **Install**
 
 ### Manual Installation
 
 ```bash
-cd ~/.n8n/nodes
-git clone https://github.com/Velocity-BPA/n8n-nodes-stellar.git
-cd n8n-nodes-stellar
-pnpm install && pnpm build
+cd ~/.n8n
+npm install n8n-nodes-stellar
 ```
 
 ### Development Installation
 
 ```bash
-# 1. Extract the zip file
-unzip n8n-nodes-stellar.zip
+git clone https://github.com/Velocity-BPA/n8n-nodes-stellar.git
 cd n8n-nodes-stellar
-
-# 2. Install dependencies
-pnpm install
-
-# 3. Build the project
-pnpm build
-
-# 4. Create symlink to n8n custom nodes directory
+npm install
+npm run build
 mkdir -p ~/.n8n/custom
 ln -s $(pwd) ~/.n8n/custom/n8n-nodes-stellar
-
-# 5. Restart n8n
 n8n start
 ```
 
 ## Credentials Setup
 
-### Stellar Network Credentials
-
-| Field | Description |
-|-------|-------------|
-| **Network** | Select: Public (Mainnet), Testnet, Futurenet, or Custom |
-| **Custom Horizon URL** | URL for custom Horizon server (custom network only) |
-| **Custom Network Passphrase** | Passphrase for custom network |
-| **Secret Key** | Your Stellar secret key (S...) for signing transactions |
-| **Soroban RPC URL** | Optional URL for Soroban smart contract operations |
-
-### Stellar Anchor Credentials
-
-| Field | Description |
-|-------|-------------|
-| **Anchor Domain** | Domain of the Stellar anchor service |
-| **Auth Token** | SEP-10 authentication token |
+| Field | Description | Required |
+|-------|-------------|----------|
+| API Key | Your Stellar service API key for authenticated requests | Yes |
+| Network | Stellar network (mainnet, testnet, custom) | Yes |
+| Horizon URL | Custom Horizon server URL (if using custom network) | No |
+| Secret Key | Account secret key for transaction signing | No |
 
 ## Resources & Operations
 
-### Account Resource
+### 1. Accounts
 
-| Operation | Description | Requires Secret Key |
-|-----------|-------------|---------------------|
-| Generate Keypair | Create a new Stellar keypair | No |
-| Get Info | Retrieve account details and balances | No |
-| Create Account | Create and fund a new account | Yes |
-| Merge Account | Merge account into destination | Yes |
-| Fund Testnet | Get free testnet XLM from Friendbot | No |
-| Set Data | Add/update account data entries | Yes |
-| Set Options | Configure account options | Yes |
+| Operation | Description |
+|-----------|-------------|
+| Get Account | Retrieve account details including balances and sequence number |
+| Create Account | Generate new Stellar keypair and fund account |
+| Get Transactions | Fetch transaction history for an account |
+| Get Operations | Retrieve operations performed by an account |
+| Get Payments | Get payment history for an account |
+| Stream Transactions | Monitor real-time transaction updates |
 
-### Payment Resource
+### 2. Assets
 
-| Operation | Description | Requires Secret Key |
-|-----------|-------------|---------------------|
-| Send Payment | Send XLM or custom assets | Yes |
-| Path Payment | Send with automatic path finding | Yes |
-| Create Claimable Balance | Create balance with conditions | Yes |
-| Claim Balance | Claim a claimable balance | Yes |
+| Operation | Description |
+|-----------|-------------|
+| Get Asset | Retrieve asset information and statistics |
+| List Assets | Get paginated list of all assets on network |
+| Create Asset | Issue a new custom asset on Stellar network |
+| Set Trustline | Establish trust relationship for asset |
+| Get Asset Holders | List accounts holding specific asset |
+| Get Asset Trades | Retrieve trading history for asset pair |
 
-### Asset Resource
+### 3. Payments
 
-| Operation | Description | Requires Secret Key |
-|-----------|-------------|---------------------|
-| Change Trust | Add or remove asset trustline | Yes |
-| Get Info | Query asset information | No |
-| Issue Asset | Issue custom assets to accounts | Yes |
+| Operation | Description |
+|-----------|-------------|
+| Send Payment | Transfer XLM or assets between accounts |
+| Create Path Payment | Execute payment through order book path |
+| Get Payment Details | Retrieve specific payment information |
+| List Payments | Get filtered list of network payments |
+| Stream Payments | Monitor real-time payment activity |
 
-### DEX Resource
+### 4. Transactions
 
-| Operation | Description | Requires Secret Key |
-|-----------|-------------|---------------------|
-| Get Orderbook | View buy/sell orders for asset pair | No |
-| Create Sell Offer | Create offer to sell assets | Yes |
-| Create Buy Offer | Create offer to buy assets | Yes |
-| Cancel Offer | Cancel an existing offer | Yes |
-| List Offers | View your active offers | Yes |
-| Get Trades | View recent trades | No |
+| Operation | Description |
+|-----------|-------------|
+| Submit Transaction | Submit signed transaction to network |
+| Get Transaction | Retrieve transaction details by hash |
+| List Transactions | Get paginated transaction list |
+| Build Transaction | Construct transaction with operations |
+| Sign Transaction | Sign transaction with account keys |
+| Stream Transactions | Monitor transaction submissions |
 
-### Transaction Resource
+### 5. SorobanContracts
 
-| Operation | Description | Requires Secret Key |
-|-----------|-------------|---------------------|
-| Get Transaction | Retrieve transaction by hash | No |
-| Sign XDR | Sign a transaction XDR | Yes |
-| Submit XDR | Submit signed XDR to network | No |
-
-### Ledger Resource
-
-| Operation | Description | Requires Secret Key |
-|-----------|-------------|---------------------|
-| Get Latest | Get the most recent ledger | No |
-| Get By Sequence | Get ledger by sequence number | No |
-| Get Fee Stats | Get current network fee statistics | No |
-
-### Soroban Resource
-
-| Operation | Description | Requires Secret Key |
-|-----------|-------------|---------------------|
-| Get Health | Check Soroban RPC health | No |
-| Invoke Contract | Execute smart contract function | Yes |
-| Simulate Transaction | Simulate without submitting | Yes |
-
-## Trigger Node
-
-The Stellar Trigger node provides real-time event streaming:
-
-| Event | Description |
-|-------|-------------|
-| New Transaction | Stream new transactions |
-| New Payment | Stream payment operations |
-| New Operation | Stream all operations |
-| New Effect | Stream account effects |
-| New Ledger | Stream new ledgers |
-| New Trade | Stream DEX trades |
+| Operation | Description |
+|-----------|-------------|
+| Deploy Contract | Deploy smart contract to Stellar network |
+| Invoke Contract | Execute contract function with parameters |
+| Get Contract Data | Retrieve contract state and storage |
+| List Contracts | Get deployed contracts for account |
+| Simulate Invoke | Test contract invocation without submitting |
+| Get Contract Events | Fetch events emitted by contract |
 
 ## Usage Examples
 
-### Generate New Keypair
-
-```
-Resource: Account
-Operation: Generate Keypair
-```
-
-### Send XLM Payment
-
-```
-Resource: Payment
-Operation: Send Payment
-Destination: GDEST...
-Amount: 10
-Asset Code: XLM
+```javascript
+// Get account balance and details
+const accountData = await stellarNode.execute({
+  resource: 'Accounts',
+  operation: 'Get Account',
+  accountId: 'GABC123DEFGHIJKLMNOPQRSTUVWXYZ456789ABCDEFGHIJKLMNOP'
+});
 ```
 
-### Create DEX Sell Offer
-
-```
-Resource: DEX
-Operation: Create Sell Offer
-Selling Asset Code: XLM
-Buying Asset Code: USDC
-Buying Asset Issuer: GA5ZSE...
-Amount: 100
-Price: 0.10
-```
-
-### Stream Payments to Account
-
-```
-Trigger: Stellar Trigger
-Event: New Payment
-Account ID: GABC...
-Cursor: now
+```javascript
+// Send XLM payment between accounts
+const payment = await stellarNode.execute({
+  resource: 'Payments',
+  operation: 'Send Payment',
+  sourceAccount: 'GABC123...',
+  destinationAccount: 'GDEF456...',
+  amount: '100',
+  assetCode: 'XLM'
+});
 ```
 
-## Stellar Concepts
+```javascript
+// Create and issue custom asset
+const asset = await stellarNode.execute({
+  resource: 'Assets',
+  operation: 'Create Asset',
+  assetCode: 'MYTOKEN',
+  issuerAccount: 'GABC123...',
+  initialSupply: '1000000',
+  description: 'My Custom Token'
+});
+```
 
-### Networks
-
-| Network | Description | Use Case |
-|---------|-------------|----------|
-| **Public (Mainnet)** | Production network with real XLM | Live applications |
-| **Testnet** | Test network with free test XLM | Development & testing |
-| **Futurenet** | Experimental features network | Soroban testing |
-
-### Assets
-
-- **Native (XLM)**: Stellar's built-in currency
-- **Custom Assets**: Tokens issued by any account (requires trustline)
-
-### Stroops
-
-Stellar uses "stroops" as the smallest unit: 1 XLM = 10,000,000 stroops
+```javascript
+// Deploy and invoke Soroban smart contract
+const contract = await stellarNode.execute({
+  resource: 'SorobanContracts',
+  operation: 'Deploy Contract',
+  wasmHash: '0x1234567890abcdef...',
+  constructorArgs: ['param1', 'param2'],
+  sourceAccount: 'GABC123...'
+});
+```
 
 ## Error Handling
 
-The node provides detailed error messages for common scenarios:
-
-| Error | Cause | Solution |
-|-------|-------|----------|
-| `Secret key required` | Operation needs signing authority | Configure secret key in credentials |
-| `Account not found` | Account doesn't exist on network | Create or fund the account first |
-| `Insufficient balance` | Not enough XLM for transaction | Add funds (min 1 XLM + fees) |
-| `Trustline required` | Missing trustline for custom asset | Add trustline first |
-
-## Security Best Practices
-
-1. **Never share your secret key** - It provides full control over your account
-2. **Use testnet for development** - Free test XLM, no real funds at risk
-3. **Store credentials securely** - Use n8n's credential encryption
-4. **Validate destinations** - Always verify recipient addresses
-5. **Monitor transactions** - Use triggers to track account activity
+| Error | Description | Solution |
+|-------|-------------|----------|
+| Invalid Account ID | Malformed Stellar account identifier | Verify account ID format (56 characters, starting with G) |
+| Insufficient Balance | Account lacks funds for transaction | Check account balance and add funds if needed |
+| Bad Sequence Number | Transaction sequence number incorrect | Fetch current account sequence and increment by 1 |
+| Invalid Signature | Transaction signature verification failed | Ensure correct secret key is used for signing |
+| Asset Not Found | Referenced asset does not exist | Verify asset code and issuer account |
+| Network Timeout | Connection to Horizon server failed | Check network connectivity and Horizon URL |
 
 ## Development
 
 ```bash
-# Install dependencies
-pnpm install
-
-# Build the project
-pnpm build
-
-# Run tests
-pnpm test
-
-# Run tests with coverage
-pnpm test:coverage
-
-# Lint code
-pnpm lint
-
-# Fix lint issues
-pnpm lint:fix
-
-# Watch mode for development
-pnpm dev
+npm install
+npm run build
+npm test
+npm run lint
+npm run dev
 ```
 
 ## Author
@@ -281,11 +203,9 @@ This n8n community node is licensed under the **Business Source License 1.1**.
 Permitted for personal, educational, research, and internal business use.
 
 ### Commercial Use
-Use of this node within any SaaS, PaaS, hosted platform, managed service,
-or paid automation offering requires a commercial license.
+Use of this node within any SaaS, PaaS, hosted platform, managed service, or paid automation offering requires a commercial license.
 
-For licensing inquiries:
-**licensing@velobpa.com**
+For licensing inquiries: **licensing@velobpa.com**
 
 See [LICENSE](LICENSE), [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md), and [LICENSING_FAQ.md](LICENSING_FAQ.md) for details.
 
@@ -294,19 +214,13 @@ See [LICENSE](LICENSE), [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md), and [LIC
 Contributions are welcome! Please ensure:
 
 1. Code follows existing style conventions
-2. All tests pass
-3. New features include appropriate tests
-4. Documentation is updated
+2. All tests pass (`npm test`)
+3. Linting passes (`npm run lint`)
+4. Documentation is updated for new features
+5. Commit messages are descriptive
 
 ## Support
 
-- **Documentation**: [Stellar Developers](https://developers.stellar.org/)
-- **n8n Community**: [community.n8n.io](https://community.n8n.io/)
 - **Issues**: [GitHub Issues](https://github.com/Velocity-BPA/n8n-nodes-stellar/issues)
-- **Licensing**: licensing@velobpa.com
-
-## Acknowledgments
-
-- [Stellar Development Foundation](https://stellar.org/) for the Stellar network
-- [n8n.io](https://n8n.io/) for the workflow automation platform
-- [Stellar SDK](https://github.com/stellar/js-stellar-sdk) for the JavaScript SDK
+- **Stellar Documentation**: [Stellar Developer Portal](https://developers.stellar.org/)
+- **Horizon API Reference**: [Horizon API Docs](https://developers.stellar.org/api)
