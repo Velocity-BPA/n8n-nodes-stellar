@@ -41,7 +41,6 @@ export class Stellar implements INodeType {
       },
     ],
     properties: [
-      // Resource selector
       {
         displayName: 'Resource',
         name: 'resource',
@@ -49,20 +48,36 @@ export class Stellar implements INodeType {
         noDataExpression: true,
         options: [
           {
+            name: 'Account',
+            value: 'account',
+          },
+          {
+            name: 'Transaction',
+            value: 'transaction',
+          },
+          {
+            name: 'Payment',
+            value: 'payment',
+          },
+          {
+            name: 'Asset',
+            value: 'asset',
+          },
+          {
+            name: 'Orderbook',
+            value: 'orderbook',
+          },
+          {
+            name: 'Ledger',
+            value: 'ledger',
+          },
+          {
+            name: 'Operation',
+            value: 'operation',
+          },
+          {
             name: 'Accounts',
             value: 'accounts',
-          },
-          {
-            name: 'unknown',
-            value: 'unknown',
-          },
-          {
-            name: 'unknown',
-            value: 'unknown',
-          },
-          {
-            name: 'unknown',
-            value: 'unknown',
           },
           {
             name: 'Assets',
@@ -73,9 +88,152 @@ export class Stellar implements INodeType {
             value: 'sorobanContracts',
           }
         ],
-        default: 'accounts',
+        default: 'account',
       },
-      // Operation dropdowns per resource
+{
+  displayName: 'Operation',
+  name: 'operation',
+  type: 'options',
+  noDataExpression: true,
+  displayOptions: { show: { resource: ['account'] } },
+  options: [
+    { name: 'Get Account', value: 'getAccount', description: 'Retrieve account details including balances and signers', action: 'Get account' },
+    { name: 'Get Accounts', value: 'getAccounts', description: 'List accounts with optional filters', action: 'Get accounts' },
+    { name: 'Get Account Transactions', value: 'getAccountTransactions', description: 'Get transactions for specific account', action: 'Get account transactions' },
+    { name: 'Get Account Operations', value: 'getAccountOperations', description: 'Get operations for specific account', action: 'Get account operations' },
+    { name: 'Get Account Payments', value: 'getAccountPayments', description: 'Get payment operations for account', action: 'Get account payments' }
+  ],
+  default: 'getAccount',
+},
+{
+  displayName: 'Operation',
+  name: 'operation',
+  type: 'options',
+  noDataExpression: true,
+  displayOptions: { show: { resource: ['transaction'] } },
+  options: [
+    {
+      name: 'Submit Transaction',
+      value: 'submitTransaction',
+      description: 'Submit a signed transaction to the network',
+      action: 'Submit transaction'
+    },
+    {
+      name: 'Get Transaction',
+      value: 'getTransaction',
+      description: 'Retrieve transaction by hash',
+      action: 'Get transaction'
+    },
+    {
+      name: 'Get Transactions',
+      value: 'getTransactions',
+      description: 'List transactions with optional filters',
+      action: 'Get transactions'
+    },
+    {
+      name: 'Get Transaction Operations',
+      value: 'getTransactionOperations',
+      description: 'Get operations within a transaction',
+      action: 'Get transaction operations'
+    },
+    {
+      name: 'Get Transaction Effects',
+      value: 'getTransactionEffects',
+      description: 'Get effects of a transaction',
+      action: 'Get transaction effects'
+    }
+  ],
+  default: 'submitTransaction',
+},
+{
+  displayName: 'Operation',
+  name: 'operation',
+  type: 'options',
+  noDataExpression: true,
+  displayOptions: { show: { resource: ['payment'] } },
+  options: [
+    { name: 'Get Payments', value: 'getPayments', description: 'List all payment operations', action: 'Get all payments' },
+    { name: 'Get Payment', value: 'getPayment', description: 'Get specific payment operation details', action: 'Get a payment' },
+    { name: 'Get Account Payments', value: 'getAccountPayments', description: 'Get payments for specific account', action: 'Get account payments' },
+    { name: 'Get Ledger Payments', value: 'getLedgerPayments', description: 'Get payments in specific ledger', action: 'Get ledger payments' },
+  ],
+  default: 'getPayments',
+},
+{
+	displayName: 'Operation',
+	name: 'operation',
+	type: 'options',
+	noDataExpression: true,
+	displayOptions: {
+		show: {
+			resource: ['asset'],
+		},
+	},
+	options: [
+		{
+			name: 'Get Assets',
+			value: 'getAssets',
+			description: 'List all assets with optional filters',
+			action: 'Get assets',
+		},
+		{
+			name: 'Get Account Balances',
+			value: 'getAccountBalances',
+			description: 'Get asset balances for account',
+			action: 'Get account balances',
+		},
+		{
+			name: 'Get Asset',
+			value: 'getAsset',
+			description: 'Get specific asset information',
+			action: 'Get asset',
+		},
+	],
+	default: 'getAssets',
+},
+{
+  displayName: 'Operation',
+  name: 'operation',
+  type: 'options',
+  noDataExpression: true,
+  displayOptions: { show: { resource: ['orderbook'] } },
+  options: [
+    { name: 'Get Orderbook', value: 'getOrderbook', description: 'Get orderbook for asset pair', action: 'Get orderbook for asset pair' },
+    { name: 'Get Trades', value: 'getTrades', description: 'List recent trades', action: 'List recent trades' },
+    { name: 'Get Account Trades', value: 'getAccountTrades', description: 'Get trades for specific account', action: 'Get trades for specific account' },
+    { name: 'Get Orderbook Trades', value: 'getOrderbookTrades', description: 'Get trades for specific asset pair', action: 'Get trades for specific asset pair' }
+  ],
+  default: 'getOrderbook',
+},
+{
+  displayName: 'Operation',
+  name: 'operation',
+  type: 'options',
+  noDataExpression: true,
+  displayOptions: { show: { resource: ['ledger'] } },
+  options: [
+    { name: 'Get Ledgers', value: 'getLedgers', description: 'List ledgers with optional filters', action: 'Get ledgers' },
+    { name: 'Get Ledger', value: 'getLedger', description: 'Get specific ledger by sequence number', action: 'Get ledger' },
+    { name: 'Get Ledger Transactions', value: 'getLedgerTransactions', description: 'Get transactions in specific ledger', action: 'Get ledger transactions' },
+    { name: 'Get Ledger Operations', value: 'getLedgerOperations', description: 'Get operations in specific ledger', action: 'Get ledger operations' },
+    { name: 'Get Ledger Effects', value: 'getLedgerEffects', description: 'Get effects in specific ledger', action: 'Get ledger effects' },
+  ],
+  default: 'getLedgers',
+},
+{
+  displayName: 'Operation',
+  name: 'operation',
+  type: 'options',
+  noDataExpression: true,
+  displayOptions: { show: { resource: ['operation'] } },
+  options: [
+    { name: 'Get Operations', value: 'getOperations', description: 'List all operations', action: 'Get operations' },
+    { name: 'Get Operation', value: 'getOperation', description: 'Get specific operation details', action: 'Get operation' },
+    { name: 'Get Account Operations', value: 'getAccountOperations', description: 'Get operations for specific account', action: 'Get account operations' },
+    { name: 'Get Transaction Operations', value: 'getTransactionOperations', description: 'Get operations within transaction', action: 'Get transaction operations' }
+  ],
+  default: 'getOperations',
+},
 {
   displayName: 'Operation',
   name: 'operation',
@@ -220,7 +378,572 @@ export class Stellar implements INodeType {
   ],
   default: 'invokeContract',
 },
-      // Parameter definitions
+{
+  displayName: 'Account ID',
+  name: 'account_id',
+  type: 'string',
+  required: true,
+  displayOptions: { 
+    show: { 
+      resource: ['account'],
+      operation: ['getAccount', 'getAccountTransactions', 'getAccountOperations', 'getAccountPayments']
+    }
+  },
+  default: '',
+  description: 'The Stellar account ID (public key)',
+},
+{
+  displayName: 'Cursor',
+  name: 'cursor',
+  type: 'string',
+  required: false,
+  displayOptions: { 
+    show: { 
+      resource: ['account'],
+      operation: ['getAccounts', 'getAccountTransactions', 'getAccountOperations', 'getAccountPayments']
+    }
+  },
+  default: '',
+  description: 'A paging token, specifying where to start returning records from',
+},
+{
+  displayName: 'Limit',
+  name: 'limit',
+  type: 'number',
+  required: false,
+  displayOptions: { 
+    show: { 
+      resource: ['account'],
+      operation: ['getAccounts', 'getAccountTransactions', 'getAccountOperations', 'getAccountPayments']
+    }
+  },
+  default: 10,
+  typeOptions: {
+    minValue: 1,
+    maxValue: 200,
+  },
+  description: 'The number of records to return (max 200)',
+},
+{
+  displayName: 'Order',
+  name: 'order',
+  type: 'options',
+  required: false,
+  displayOptions: { 
+    show: { 
+      resource: ['account'],
+      operation: ['getAccounts', 'getAccountTransactions', 'getAccountOperations', 'getAccountPayments']
+    }
+  },
+  options: [
+    { name: 'Ascending', value: 'asc' },
+    { name: 'Descending', value: 'desc' }
+  ],
+  default: 'asc',
+  description: 'The order in which to return rows',
+},
+{
+  displayName: 'Transaction XDR',
+  name: 'tx',
+  type: 'string',
+  required: true,
+  displayOptions: {
+    show: {
+      resource: ['transaction'],
+      operation: ['submitTransaction']
+    }
+  },
+  default: '',
+  description: 'The signed transaction in XDR format'
+},
+{
+  displayName: 'Transaction Hash',
+  name: 'hash',
+  type: 'string',
+  required: true,
+  displayOptions: {
+    show: {
+      resource: ['transaction'],
+      operation: ['getTransaction', 'getTransactionOperations', 'getTransactionEffects']
+    }
+  },
+  default: '',
+  description: 'The hash of the transaction'
+},
+{
+  displayName: 'Cursor',
+  name: 'cursor',
+  type: 'string',
+  displayOptions: {
+    show: {
+      resource: ['transaction'],
+      operation: ['getTransactions', 'getTransactionOperations', 'getTransactionEffects']
+    }
+  },
+  default: '',
+  description: 'A paging token, specifying where to start returning records from'
+},
+{
+  displayName: 'Limit',
+  name: 'limit',
+  type: 'number',
+  displayOptions: {
+    show: {
+      resource: ['transaction'],
+      operation: ['getTransactions', 'getTransactionOperations', 'getTransactionEffects']
+    }
+  },
+  default: 10,
+  description: 'The maximum number of records to return',
+  typeOptions: {
+    minValue: 1,
+    maxValue: 200
+  }
+},
+{
+  displayName: 'Order',
+  name: 'order',
+  type: 'options',
+  displayOptions: {
+    show: {
+      resource: ['transaction'],
+      operation: ['getTransactions']
+    }
+  },
+  options: [
+    {
+      name: 'Ascending',
+      value: 'asc'
+    },
+    {
+      name: 'Descending',
+      value: 'desc'
+    }
+  ],
+  default: 'asc',
+  description: 'The order in which to return records'
+},
+{
+  displayName: 'Payment ID',
+  name: 'paymentId',
+  type: 'string',
+  required: true,
+  displayOptions: { show: { resource: ['payment'], operation: ['getPayment'] } },
+  default: '',
+  description: 'The ID of the payment operation to retrieve',
+},
+{
+  displayName: 'Account ID',
+  name: 'accountId',
+  type: 'string',
+  required: true,
+  displayOptions: { show: { resource: ['payment'], operation: ['getAccountPayments'] } },
+  default: '',
+  description: 'The account ID to get payments for',
+},
+{
+  displayName: 'Ledger Sequence',
+  name: 'sequence',
+  type: 'string',
+  required: true,
+  displayOptions: { show: { resource: ['payment'], operation: ['getLedgerPayments'] } },
+  default: '',
+  description: 'The sequence number of the ledger',
+},
+{
+  displayName: 'Cursor',
+  name: 'cursor',
+  type: 'string',
+  displayOptions: { show: { resource: ['payment'], operation: ['getPayments', 'getAccountPayments', 'getLedgerPayments'] } },
+  default: '',
+  description: 'A paging token specifying where to start returning records from',
+},
+{
+  displayName: 'Limit',
+  name: 'limit',
+  type: 'number',
+  displayOptions: { show: { resource: ['payment'], operation: ['getPayments', 'getAccountPayments', 'getLedgerPayments'] } },
+  default: 10,
+  description: 'The maximum number of records to return',
+  typeOptions: { minValue: 1, maxValue: 200 },
+},
+{
+  displayName: 'Order',
+  name: 'order',
+  type: 'options',
+  displayOptions: { show: { resource: ['payment'], operation: ['getPayments', 'getAccountPayments', 'getLedgerPayments'] } },
+  options: [
+    { name: 'Ascending', value: 'asc' },
+    { name: 'Descending', value: 'desc' },
+  ],
+  default: 'asc',
+  description: 'The order in which to return rows',
+},
+{
+	displayName: 'Asset Code',
+	name: 'assetCode',
+	type: 'string',
+	default: '',
+	description: 'The asset code to filter by',
+	displayOptions: {
+		show: {
+			resource: ['asset'],
+			operation: ['getAssets'],
+		},
+	},
+},
+{
+	displayName: 'Asset Issuer',
+	name: 'assetIssuer',
+	type: 'string',
+	default: '',
+	description: 'The asset issuer account ID to filter by',
+	displayOptions: {
+		show: {
+			resource: ['asset'],
+			operation: ['getAssets'],
+		},
+	},
+},
+{
+	displayName: 'Cursor',
+	name: 'cursor',
+	type: 'string',
+	default: '',
+	description: 'A cursor to start pagination from',
+	displayOptions: {
+		show: {
+			resource: ['asset'],
+			operation: ['getAssets'],
+		},
+	},
+},
+{
+	displayName: 'Limit',
+	name: 'limit',
+	type: 'number',
+	default: 10,
+	description: 'Maximum number of assets to return',
+	typeOptions: {
+		minValue: 1,
+		maxValue: 200,
+	},
+	displayOptions: {
+		show: {
+			resource: ['asset'],
+			operation: ['getAssets'],
+		},
+	},
+},
+{
+	displayName: 'Order',
+	name: 'order',
+	type: 'options',
+	default: 'asc',
+	options: [
+		{
+			name: 'Ascending',
+			value: 'asc',
+		},
+		{
+			name: 'Descending',
+			value: 'desc',
+		},
+	],
+	description: 'The order to sort results',
+	displayOptions: {
+		show: {
+			resource: ['asset'],
+			operation: ['getAssets'],
+		},
+	},
+},
+{
+	displayName: 'Account ID',
+	name: 'accountId',
+	type: 'string',
+	required: true,
+	default: '',
+	description: 'The account ID to get balances for',
+	displayOptions: {
+		show: {
+			resource: ['asset'],
+			operation: ['getAccountBalances'],
+		},
+	},
+},
+{
+	displayName: 'Asset Code',
+	name: 'assetCode',
+	type: 'string',
+	required: true,
+	default: '',
+	description: 'The asset code to get information for',
+	displayOptions: {
+		show: {
+			resource: ['asset'],
+			operation: ['getAsset'],
+		},
+	},
+},
+{
+	displayName: 'Asset Issuer',
+	name: 'assetIssuer',
+	type: 'string',
+	required: true,
+	default: '',
+	description: 'The asset issuer account ID',
+	displayOptions: {
+		show: {
+			resource: ['asset'],
+			operation: ['getAsset'],
+		},
+	},
+},
+{
+  displayName: 'Selling Asset Type',
+  name: 'selling_asset_type',
+  type: 'options',
+  required: true,
+  displayOptions: { show: { resource: ['orderbook'], operation: ['getOrderbook', 'getOrderbookTrades'] } },
+  options: [
+    { name: 'Native', value: 'native' },
+    { name: 'Credit Alphanum4', value: 'credit_alphanum4' },
+    { name: 'Credit Alphanum12', value: 'credit_alphanum12' }
+  ],
+  default: 'native',
+  description: 'The type of the selling asset',
+},
+{
+  displayName: 'Selling Asset Code',
+  name: 'selling_asset_code',
+  type: 'string',
+  displayOptions: { show: { resource: ['orderbook'], operation: ['getOrderbook', 'getOrderbookTrades'], selling_asset_type: ['credit_alphanum4', 'credit_alphanum12'] } },
+  default: '',
+  description: 'The code of the selling asset',
+},
+{
+  displayName: 'Selling Asset Issuer',
+  name: 'selling_asset_issuer',
+  type: 'string',
+  displayOptions: { show: { resource: ['orderbook'], operation: ['getOrderbook', 'getOrderbookTrades'], selling_asset_type: ['credit_alphanum4', 'credit_alphanum12'] } },
+  default: '',
+  description: 'The issuer of the selling asset',
+},
+{
+  displayName: 'Buying Asset Type',
+  name: 'buying_asset_type',
+  type: 'options',
+  required: true,
+  displayOptions: { show: { resource: ['orderbook'], operation: ['getOrderbook', 'getOrderbookTrades'] } },
+  options: [
+    { name: 'Native', value: 'native' },
+    { name: 'Credit Alphanum4', value: 'credit_alphanum4' },
+    { name: 'Credit Alphanum12', value: 'credit_alphanum12' }
+  ],
+  default: 'native',
+  description: 'The type of the buying asset',
+},
+{
+  displayName: 'Buying Asset Code',
+  name: 'buying_asset_code',
+  type: 'string',
+  displayOptions: { show: { resource: ['orderbook'], operation: ['getOrderbook', 'getOrderbookTrades'], buying_asset_type: ['credit_alphanum4', 'credit_alphanum12'] } },
+  default: '',
+  description: 'The code of the buying asset',
+},
+{
+  displayName: 'Buying Asset Issuer',
+  name: 'buying_asset_issuer',
+  type: 'string',
+  displayOptions: { show: { resource: ['orderbook'], operation: ['getOrderbook', 'getOrderbookTrades'], buying_asset_type: ['credit_alphanum4', 'credit_alphanum12'] } },
+  default: '',
+  description: 'The issuer of the buying asset',
+},
+{
+  displayName: 'Account ID',
+  name: 'account_id',
+  type: 'string',
+  required: true,
+  displayOptions: { show: { resource: ['orderbook'], operation: ['getAccountTrades'] } },
+  default: '',
+  description: 'The account ID to get trades for',
+},
+{
+  displayName: 'Cursor',
+  name: 'cursor',
+  type: 'string',
+  displayOptions: { show: { resource: ['orderbook'], operation: ['getTrades', 'getAccountTrades', 'getOrderbookTrades'] } },
+  default: '',
+  description: 'A paging token, specifying where to start returning records from',
+},
+{
+  displayName: 'Limit',
+  name: 'limit',
+  type: 'number',
+  displayOptions: { show: { resource: ['orderbook'], operation: ['getOrderbook', 'getTrades', 'getAccountTrades', 'getOrderbookTrades'] } },
+  typeOptions: { minValue: 1, maxValue: 200 },
+  default: 20,
+  description: 'The number of records to return',
+},
+{
+  displayName: 'Order',
+  name: 'order',
+  type: 'options',
+  displayOptions: { show: { resource: ['orderbook'], operation: ['getTrades', 'getAccountTrades'] } },
+  options: [
+    { name: 'Ascending', value: 'asc' },
+    { name: 'Descending', value: 'desc' }
+  ],
+  default: 'desc',
+  description: 'The order of the returned records',
+},
+{
+  displayName: 'Sequence Number',
+  name: 'sequence',
+  type: 'string',
+  required: true,
+  displayOptions: {
+    show: {
+      resource: ['ledger'],
+      operation: ['getLedger', 'getLedgerTransactions', 'getLedgerOperations', 'getLedgerEffects'],
+    },
+  },
+  default: '',
+  description: 'The sequence number of the ledger',
+},
+{
+  displayName: 'Cursor',
+  name: 'cursor',
+  type: 'string',
+  displayOptions: {
+    show: {
+      resource: ['ledger'],
+      operation: ['getLedgers', 'getLedgerTransactions', 'getLedgerOperations', 'getLedgerEffects'],
+    },
+  },
+  default: '',
+  description: 'A paging token specifying where to start returning records from',
+},
+{
+  displayName: 'Limit',
+  name: 'limit',
+  type: 'number',
+  displayOptions: {
+    show: {
+      resource: ['ledger'],
+      operation: ['getLedgers', 'getLedgerTransactions', 'getLedgerOperations', 'getLedgerEffects'],
+    },
+  },
+  default: 10,
+  description: 'The maximum number of records to return',
+},
+{
+  displayName: 'Order',
+  name: 'order',
+  type: 'options',
+  displayOptions: {
+    show: {
+      resource: ['ledger'],
+      operation: ['getLedgers'],
+    },
+  },
+  options: [
+    { name: 'Ascending', value: 'asc' },
+    { name: 'Descending', value: 'desc' },
+  ],
+  default: 'asc',
+  description: 'The order in which to return rows',
+},
+{
+  displayName: 'Cursor',
+  name: 'cursor',
+  type: 'string',
+  default: '',
+  description: 'A paging token, specifying where to start returning records from',
+  displayOptions: {
+    show: {
+      resource: ['operation'],
+      operation: ['getOperations', 'getAccountOperations', 'getTransactionOperations']
+    }
+  }
+},
+{
+  displayName: 'Limit',
+  name: 'limit',
+  type: 'number',
+  default: 10,
+  description: 'The maximum number of records returned',
+  typeOptions: {
+    minValue: 1,
+    maxValue: 200
+  },
+  displayOptions: {
+    show: {
+      resource: ['operation'],
+      operation: ['getOperations', 'getAccountOperations', 'getTransactionOperations']
+    }
+  }
+},
+{
+  displayName: 'Order',
+  name: 'order',
+  type: 'options',
+  options: [
+    { name: 'Ascending', value: 'asc' },
+    { name: 'Descending', value: 'desc' }
+  ],
+  default: 'asc',
+  description: 'The order in which to return rows',
+  displayOptions: {
+    show: {
+      resource: ['operation'],
+      operation: ['getOperations', 'getAccountOperations', 'getTransactionOperations']
+    }
+  }
+},
+{
+  displayName: 'Operation ID',
+  name: 'id',
+  type: 'string',
+  required: true,
+  default: '',
+  description: 'The unique identifier for the operation',
+  displayOptions: {
+    show: {
+      resource: ['operation'],
+      operation: ['getOperation']
+    }
+  }
+},
+{
+  displayName: 'Account ID',
+  name: 'account_id',
+  type: 'string',
+  required: true,
+  default: '',
+  description: 'The account ID to retrieve operations for',
+  displayOptions: {
+    show: {
+      resource: ['operation'],
+      operation: ['getAccountOperations']
+    }
+  }
+},
+{
+  displayName: 'Transaction Hash',
+  name: 'hash',
+  type: 'string',
+  required: true,
+  default: '',
+  description: 'The transaction hash to retrieve operations for',
+  displayOptions: {
+    show: {
+      resource: ['operation'],
+      operation: ['getTransactionOperations']
+    }
+  }
+},
 {
   displayName: 'Account ID',
   name: 'accountId',
@@ -964,14 +1687,22 @@ export class Stellar implements INodeType {
     const resource = this.getNodeParameter('resource', 0) as string;
 
     switch (resource) {
+      case 'account':
+        return [await executeAccountOperations.call(this, items)];
+      case 'transaction':
+        return [await executeTransactionOperations.call(this, items)];
+      case 'payment':
+        return [await executePaymentOperations.call(this, items)];
+      case 'asset':
+        return [await executeAssetOperations.call(this, items)];
+      case 'orderbook':
+        return [await executeOrderbookOperations.call(this, items)];
+      case 'ledger':
+        return [await executeLedgerOperations.call(this, items)];
+      case 'operation':
+        return [await executeOperationOperations.call(this, items)];
       case 'accounts':
         return [await executeAccountsOperations.call(this, items)];
-      case 'unknown':
-        return [await executeunknownOperations.call(this, items)];
-      case 'unknown':
-        return [await executeunknownOperations.call(this, items)];
-      case 'unknown':
-        return [await executeunknownOperations.call(this, items)];
       case 'assets':
         return [await executeAssetsOperations.call(this, items)];
       case 'sorobanContracts':
@@ -986,7 +1717,7 @@ export class Stellar implements INodeType {
 // Resource Handler Functions
 // ============================================================
 
-async function executeAccountsOperations(
+async function executeAccountOperations(
   this: IExecuteFunctions,
   items: INodeExecutionData[],
 ): Promise<INodeExecutionData[]> {
@@ -1001,12 +1732,12 @@ async function executeAccountsOperations(
 
       switch (operation) {
         case 'getAccount': {
-          const accountId = this.getNodeParameter('accountId', i) as string;
+          const accountId = this.getNodeParameter('account_id', i) as string;
           const options: any = {
             method: 'GET',
             url: `${baseUrl}/accounts/${accountId}`,
             headers: {
-              'X-Client-Name': 'n8n-stellar-node',
+              'Content-Type': 'application/json',
             },
             json: true,
           };
@@ -1020,23 +1751,20 @@ async function executeAccountsOperations(
         }
 
         case 'getAccounts': {
-          const queryParams: any = {};
           const cursor = this.getNodeParameter('cursor', i, '') as string;
           const limit = this.getNodeParameter('limit', i, 10) as number;
           const order = this.getNodeParameter('order', i, 'asc') as string;
 
-          if (cursor) queryParams.cursor = cursor;
-          if (limit) queryParams.limit = limit;
-          if (order) queryParams.order = order;
-
-          const queryString = new URLSearchParams(queryParams).toString();
-          const url = queryString ? `${baseUrl}/accounts?${queryString}` : `${baseUrl}/accounts`;
+          const queryParams = new URLSearchParams();
+          if (cursor) queryParams.append('cursor', cursor);
+          if (limit) queryParams.append('limit', limit.toString());
+          if (order) queryParams.append('order', order);
 
           const options: any = {
             method: 'GET',
-            url,
+            url: `${baseUrl}/accounts?${queryParams.toString()}`,
             headers: {
-              'X-Client-Name': 'n8n-stellar-node',
+              'Content-Type': 'application/json',
             },
             json: true,
           };
@@ -1050,26 +1778,21 @@ async function executeAccountsOperations(
         }
 
         case 'getAccountTransactions': {
-          const accountId = this.getNodeParameter('accountId', i) as string;
-          const queryParams: any = {};
+          const accountId = this.getNodeParameter('account_id', i) as string;
           const cursor = this.getNodeParameter('cursor', i, '') as string;
           const limit = this.getNodeParameter('limit', i, 10) as number;
           const order = this.getNodeParameter('order', i, 'asc') as string;
 
-          if (cursor) queryParams.cursor = cursor;
-          if (limit) queryParams.limit = limit;
-          if (order) queryParams.order = order;
-
-          const queryString = new URLSearchParams(queryParams).toString();
-          const url = queryString 
-            ? `${baseUrl}/accounts/${accountId}/transactions?${queryString}` 
-            : `${baseUrl}/accounts/${accountId}/transactions`;
+          const queryParams = new URLSearchParams();
+          if (cursor) queryParams.append('cursor', cursor);
+          if (limit) queryParams.append('limit', limit.toString());
+          if (order) queryParams.append('order', order);
 
           const options: any = {
             method: 'GET',
-            url,
+            url: `${baseUrl}/accounts/${accountId}/transactions?${queryParams.toString()}`,
             headers: {
-              'X-Client-Name': 'n8n-stellar-node',
+              'Content-Type': 'application/json',
             },
             json: true,
           };
@@ -1083,26 +1806,21 @@ async function executeAccountsOperations(
         }
 
         case 'getAccountOperations': {
-          const accountId = this.getNodeParameter('accountId', i) as string;
-          const queryParams: any = {};
+          const accountId = this.getNodeParameter('account_id', i) as string;
           const cursor = this.getNodeParameter('cursor', i, '') as string;
           const limit = this.getNodeParameter('limit', i, 10) as number;
           const order = this.getNodeParameter('order', i, 'asc') as string;
 
-          if (cursor) queryParams.cursor = cursor;
-          if (limit) queryParams.limit = limit;
-          if (order) queryParams.order = order;
-
-          const queryString = new URLSearchParams(queryParams).toString();
-          const url = queryString 
-            ? `${baseUrl}/accounts/${accountId}/operations?${queryString}` 
-            : `${baseUrl}/accounts/${accountId}/operations`;
+          const queryParams = new URLSearchParams();
+          if (cursor) queryParams.append('cursor', cursor);
+          if (limit) queryParams.append('limit', limit.toString());
+          if (order) queryParams.append('order', order);
 
           const options: any = {
             method: 'GET',
-            url,
+            url: `${baseUrl}/accounts/${accountId}/operations?${queryParams.toString()}`,
             headers: {
-              'X-Client-Name': 'n8n-stellar-node',
+              'Content-Type': 'application/json',
             },
             json: true,
           };
@@ -1116,26 +1834,21 @@ async function executeAccountsOperations(
         }
 
         case 'getAccountPayments': {
-          const accountId = this.getNodeParameter('accountId', i) as string;
-          const queryParams: any = {};
+          const accountId = this.getNodeParameter('account_id', i) as string;
           const cursor = this.getNodeParameter('cursor', i, '') as string;
           const limit = this.getNodeParameter('limit', i, 10) as number;
           const order = this.getNodeParameter('order', i, 'asc') as string;
 
-          if (cursor) queryParams.cursor = cursor;
-          if (limit) queryParams.limit = limit;
-          if (order) queryParams.order = order;
-
-          const queryString = new URLSearchParams(queryParams).toString();
-          const url = queryString 
-            ? `${baseUrl}/accounts/${accountId}/payments?${queryString}` 
-            : `${baseUrl}/accounts/${accountId}/payments`;
+          const queryParams = new URLSearchParams();
+          if (cursor) queryParams.append('cursor', cursor);
+          if (limit) queryParams.append('limit', limit.toString());
+          if (order) queryParams.append('order', order);
 
           const options: any = {
             method: 'GET',
-            url,
+            url: `${baseUrl}/accounts/${accountId}/payments?${queryParams.toString()}`,
             headers: {
-              'X-Client-Name': 'n8n-stellar-node',
+              'Content-Type': 'application/json',
             },
             json: true,
           };
@@ -1143,491 +1856,6 @@ async function executeAccountsOperations(
           if (credentials.apiKey) {
             options.headers['Authorization'] = `Bearer ${credentials.apiKey}`;
           }
-
-          result = await this.helpers.httpRequest(options) as any;
-          break;
-        }
-
-        case 'getAccountEffects': {
-          const accountId = this.getNodeParameter('accountId', i) as string;
-          const queryParams: any = {};
-          const cursor = this.getNodeParameter('cursor', i, '') as string;
-          const limit = this.getNodeParameter('limit', i, 10) as number;
-          const order = this.getNodeParameter('order', i, 'asc') as string;
-
-          if (cursor) queryParams.cursor = cursor;
-          if (limit) queryParams.limit = limit;
-          if (order) queryParams.order = order;
-
-          const queryString = new URLSearchParams(queryParams).toString();
-          const url = queryString 
-            ? `${baseUrl}/accounts/${accountId}/effects?${queryString}` 
-            : `${baseUrl}/accounts/${accountId}/effects`;
-
-          const options: any = {
-            method: 'GET',
-            url,
-            headers: {
-              'X-Client-Name': 'n8n-stellar-node',
-            },
-            json: true,
-          };
-
-          if (credentials.apiKey) {
-            options.headers['Authorization'] = `Bearer ${credentials.apiKey}`;
-          }
-
-          result = await this.helpers.httpRequest(options) as any;
-          break;
-        }
-
-        default:
-          throw new NodeOperationError(this.getNode(), `Unknown operation: ${operation}`);
-      }
-
-      returnData.push({ json: result, pairedItem: { item: i } });
-    } catch (error: any) {
-      if (this.continueOnFail()) {
-        returnData.push({ 
-          json: { error: error.message }, 
-          pairedItem: { item: i } 
-        });
-      } else {
-        if (error.httpCode) {
-          throw new NodeApiError(this.getNode(), error);
-        }
-        throw new NodeOperationError(this.getNode(), error.message);
-      }
-    }
-  }
-
-  return returnData;
-}
-
-// PARSE ERROR for unknown — manual fix needed
-// Raw: // No additional imports
-
-{
-  displayName: 'Operation',
-  name: 'operation',
-  type: 'options',
-  noDataExpression: true,
-  displayOptions: {
-    show: {
-      resource: ['payments'],
-    },
-  },
-  options: [
-    {
-      name: 'Submit Payment',
-      value: 'submitPayment',
-      description: 'Submi
-
-// PARSE ERROR for unknown — manual fix needed
-// Raw: // No additional imports
-
-{
-  displayName: 'Operation',
-  name: 'operation',
-  type: 'options',
-  noDataExpression: true,
-  displayOptions: {
-    show: {
-      resource: ['tradingOffers'],
-    },
-  },
-  options: [
-    {
-      name: 'Get Offers',
-      value: 'getOffers',
-      description: 'Get list
-
-// PARSE ERROR for unknown — manual fix needed
-// Raw: // No additional imports
-
-{
-  displayName: 'Operation',
-  name: 'operation',
-  type: 'options',
-  noDataExpression: true,
-  displayOptions: {
-    show: {
-      resource: ['orderbook'],
-    },
-  },
-  options: [
-    {
-      name: 'Get Orderbook',
-      value: 'getOrderbook',
-      description: 'Get or
-
-async function executeAssetsOperations(
-  this: IExecuteFunctions,
-  items: INodeExecutionData[],
-): Promise<INodeExecutionData[]> {
-  const returnData: INodeExecutionData[] = [];
-  const operation = this.getNodeParameter('operation', 0) as string;
-  const credentials = await this.getCredentials('stellarApi') as any;
-
-  for (let i = 0; i < items.length; i++) {
-    try {
-      let result: any;
-
-      switch (operation) {
-        case 'getAssets': {
-          const queryParams: any = {};
-          
-          const assetCode = this.getNodeParameter('asset_code', i, '') as string;
-          const assetIssuer = this.getNodeParameter('asset_issuer', i, '') as string;
-          const cursor = this.getNodeParameter('cursor', i, '') as string;
-          const limit = this.getNodeParameter('limit', i, 10) as number;
-          const order = this.getNodeParameter('order', i, 'asc') as string;
-
-          if (assetCode) queryParams.asset_code = assetCode;
-          if (assetIssuer) queryParams.asset_issuer = assetIssuer;
-          if (cursor) queryParams.cursor = cursor;
-          if (limit) queryParams.limit = limit;
-          if (order) queryParams.order = order;
-
-          const options: any = {
-            method: 'GET',
-            url: `${credentials.baseUrl}/assets`,
-            headers: {
-              'Authorization': `Bearer ${credentials.apiKey}`,
-              'Content-Type': 'application/json',
-            },
-            qs: queryParams,
-            json: true,
-          };
-
-          result = await this.helpers.httpRequest(options) as any;
-          break;
-        }
-
-        case 'getAsset': {
-          const assetCode = this.getNodeParameter('asset_code', i) as string;
-          const assetIssuer = this.getNodeParameter('asset_issuer', i) as string;
-
-          if (!assetCode || !assetIssuer) {
-            throw new NodeOperationError(this.getNode(), 'Asset code and issuer are required for getting specific asset');
-          }
-
-          const options: any = {
-            method: 'GET',
-            url: `${credentials.baseUrl}/assets/${encodeURIComponent(assetCode)}/${encodeURIComponent(assetIssuer)}`,
-            headers: {
-              'Authorization': `Bearer ${credentials.apiKey}`,
-              'Content-Type': 'application/json',
-            },
-            json: true,
-          };
-
-          result = await this.helpers.httpRequest(options) as any;
-          break;
-        }
-
-        case 'createAsset': {
-          const assetCode = this.getNodeParameter('asset_code', i) as string;
-          const limit = this.getNodeParameter('limit', i, '') as string;
-          const authorizeFlags = this.getNodeParameter('authorize_flags', i, []) as string[];
-
-          if (!assetCode) {
-            throw new NodeOperationError(this.getNode(), 'Asset code is required for creating asset');
-          }
-
-          const transactionData: any = {
-            operations: [
-              {
-                type: 'create_asset',
-                asset_code: assetCode,
-                limit: limit,
-                authorize_flags: authorizeFlags,
-              },
-            ],
-          };
-
-          const options: any = {
-            method: 'POST',
-            url: `${credentials.baseUrl}/transactions`,
-            headers: {
-              'Authorization': `Bearer ${credentials.apiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: transactionData,
-            json: true,
-          };
-
-          result = await this.helpers.httpRequest(options) as any;
-          break;
-        }
-
-        case 'changeAssetTrust': {
-          const asset = this.getNodeParameter('asset', i) as string;
-          const limit = this.getNodeParameter('limit', i, '') as string;
-
-          if (!asset) {
-            throw new NodeOperationError(this.getNode(), 'Asset is required for changing trust');
-          }
-
-          const transactionData: any = {
-            operations: [
-              {
-                type: 'change_trust',
-                asset: asset,
-                limit: limit,
-              },
-            ],
-          };
-
-          const options: any = {
-            method: 'POST',
-            url: `${credentials.baseUrl}/transactions`,
-            headers: {
-              'Authorization': `Bearer ${credentials.apiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: transactionData,
-            json: true,
-          };
-
-          result = await this.helpers.httpRequest(options) as any;
-          break;
-        }
-
-        case 'setAssetOptions': {
-          const inflationDest = this.getNodeParameter('inflation_dest', i, '') as string;
-          const clearFlags = this.getNodeParameter('clear_flags', i, []) as string[];
-          const setFlags = this.getNodeParameter('set_flags', i, []) as string[];
-          const masterWeight = this.getNodeParameter('master_weight', i, 1) as number;
-
-          const transactionData: any = {
-            operations: [
-              {
-                type: 'set_options',
-                inflation_dest: inflationDest || undefined,
-                clear_flags: clearFlags.length > 0 ? clearFlags : undefined,
-                set_flags: setFlags.length > 0 ? setFlags : undefined,
-                master_weight: masterWeight,
-              },
-            ],
-          };
-
-          const options: any = {
-            method: 'POST',
-            url: `${credentials.baseUrl}/transactions`,
-            headers: {
-              'Authorization': `Bearer ${credentials.apiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: transactionData,
-            json: true,
-          };
-
-          result = await this.helpers.httpRequest(options) as any;
-          break;
-        }
-
-        default:
-          throw new NodeOperationError(this.getNode(), `Unknown operation: ${operation}`);
-      }
-
-      returnData.push({
-        json: result,
-        pairedItem: { item: i },
-      });
-
-    } catch (error: any) {
-      if (this.continueOnFail()) {
-        returnData.push({
-          json: { error: error.message },
-          pairedItem: { item: i },
-        });
-      } else {
-        throw new NodeApiError(this.getNode(), error);
-      }
-    }
-  }
-
-  return returnData;
-}
-
-async function executeSorobanContractsOperations(
-  this: IExecuteFunctions,
-  items: INodeExecutionData[],
-): Promise<INodeExecutionData[]> {
-  const returnData: INodeExecutionData[] = [];
-  const operation = this.getNodeParameter('operation', 0) as string;
-  const credentials = await this.getCredentials('stellarApi') as any;
-
-  for (let i = 0; i < items.length; i++) {
-    try {
-      let result: any;
-
-      switch (operation) {
-        case 'invokeContract': {
-          const contractAddress = this.getNodeParameter('contract_address', i) as string;
-          const functionName = this.getNodeParameter('function_name', i) as string;
-          const parameters = this.getNodeParameter('parameters', i) as string;
-          const sourceAccount = this.getNodeParameter('source_account', i) as string;
-
-          const requestBody = {
-            jsonrpc: '2.0',
-            id: 1,
-            method: 'simulateTransaction',
-            params: {
-              transaction: {
-                sourceAccount,
-                operations: [{
-                  type: 'invokeHostFunction',
-                  hostFunction: {
-                    type: 'invokeContract',
-                    contractAddress,
-                    functionName,
-                    args: JSON.parse(parameters),
-                  },
-                }],
-              },
-            },
-          };
-
-          const options: any = {
-            method: 'POST',
-            url: `${credentials.baseUrl}/soroban/rpc`,
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${credentials.apiKey}`,
-            },
-            body: requestBody,
-            json: true,
-          };
-
-          result = await this.helpers.httpRequest(options) as any;
-          break;
-        }
-
-        case 'simulateTransaction': {
-          const transaction = this.getNodeParameter('transaction', i) as string;
-
-          const requestBody = {
-            jsonrpc: '2.0',
-            id: 1,
-            method: 'simulateTransaction',
-            params: {
-              transaction: JSON.parse(transaction),
-            },
-          };
-
-          const options: any = {
-            method: 'POST',
-            url: `${credentials.baseUrl}/soroban/rpc`,
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${credentials.apiKey}`,
-            },
-            body: requestBody,
-            json: true,
-          };
-
-          result = await this.helpers.httpRequest(options) as any;
-          break;
-        }
-
-        case 'getContract': {
-          const contractId = this.getNodeParameter('contract_id', i) as string;
-
-          const options: any = {
-            method: 'GET',
-            url: `${credentials.baseUrl}/contracts/${contractId}`,
-            headers: {
-              'Authorization': `Bearer ${credentials.apiKey}`,
-            },
-            json: true,
-          };
-
-          result = await this.helpers.httpRequest(options) as any;
-          break;
-        }
-
-        case 'deployContract': {
-          const contractWasm = this.getNodeParameter('contract_wasm', i) as string;
-          const constructorArgs = this.getNodeParameter('constructor_args', i) as string;
-
-          const requestBody = {
-            operations: [{
-              type: 'createContract',
-              contractDataXDR: contractWasm,
-              constructorArgs: JSON.parse(constructorArgs),
-            }],
-          };
-
-          const options: any = {
-            method: 'POST',
-            url: `${credentials.baseUrl}/transactions`,
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${credentials.apiKey}`,
-            },
-            body: requestBody,
-            json: true,
-          };
-
-          result = await this.helpers.httpRequest(options) as any;
-          break;
-        }
-
-        case 'getContractData': {
-          const contractAddress = this.getNodeParameter('contract_address', i) as string;
-          const key = this.getNodeParameter('key', i) as string;
-          const durability = this.getNodeParameter('durability', i) as string;
-
-          const requestBody = {
-            jsonrpc: '2.0',
-            id: 1,
-            method: 'getContractData',
-            params: {
-              contractId: contractAddress,
-              key,
-              durability,
-            },
-          };
-
-          const options: any = {
-            method: 'POST',
-            url: `${credentials.baseUrl}/soroban/rpc`,
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${credentials.apiKey}`,
-            },
-            body: requestBody,
-            json: true,
-          };
-
-          result = await this.helpers.httpRequest(options) as any;
-          break;
-        }
-
-        case 'getLedgerEntries': {
-          const keys = this.getNodeParameter('keys', i) as string;
-
-          const requestBody = {
-            jsonrpc: '2.0',
-            id: 1,
-            method: 'getLedgerEntries',
-            params: {
-              keys: JSON.parse(keys),
-            },
-          };
-
-          const options: any = {
-            method: 'POST',
-            url: `${credentials.baseUrl}/soroban/rpc`,
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${credentials.apiKey}`,
-            },
-            body: requestBody,
-            json: true,
-          };
 
           result = await this.helpers.httpRequest(options) as any;
           break;
@@ -1642,10 +1870,127 @@ async function executeSorobanContractsOperations(
       if (this.continueOnFail()) {
         returnData.push({ json: { error: error.message }, pairedItem: { item: i } });
       } else {
-        throw new NodeApiError(this.getNode(), error);
+        throw error;
       }
     }
   }
 
   return returnData;
 }
+
+async function executeTransactionOperations(
+  this: IExecuteFunctions,
+  items: INodeExecutionData[],
+): Promise<INodeExecutionData[]> {
+  const returnData: INodeExecutionData[] = [];
+  const operation = this.getNodeParameter('operation', 0) as string;
+  const credentials = await this.getCredentials('stellarApi') as any;
+
+  for (let i = 0; i < items.length; i++) {
+    try {
+      let result: any;
+
+      switch (operation) {
+        case 'submitTransaction': {
+          const tx = this.getNodeParameter('tx', i) as string;
+          
+          const options: any = {
+            method: 'POST',
+            url: `${credentials.baseUrl}/transactions`,
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            form: {
+              tx: tx
+            },
+            json: true
+          };
+
+          if (credentials.apiKey) {
+            options.headers['Authorization'] = `Bearer ${credentials.apiKey}`;
+          }
+
+          result = await this.helpers.httpRequest(options) as any;
+          break;
+        }
+
+        case 'getTransaction': {
+          const hash = this.getNodeParameter('hash', i) as string;
+          
+          const options: any = {
+            method: 'GET',
+            url: `${credentials.baseUrl}/transactions/${hash}`,
+            headers: {
+              'Accept': 'application/json'
+            },
+            json: true
+          };
+
+          if (credentials.apiKey) {
+            options.headers['Authorization'] = `Bearer ${credentials.apiKey}`;
+          }
+
+          result = await this.helpers.httpRequest(options) as any;
+          break;
+        }
+
+        case 'getTransactions': {
+          const cursor = this.getNodeParameter('cursor', i, '') as string;
+          const limit = this.getNodeParameter('limit', i, 10) as number;
+          const order = this.getNodeParameter('order', i, 'asc') as string;
+
+          const queryParams: string[] = [];
+          if (cursor) queryParams.push(`cursor=${encodeURIComponent(cursor)}`);
+          if (limit) queryParams.push(`limit=${limit}`);
+          if (order) queryParams.push(`order=${order}`);
+
+          const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
+          
+          const options: any = {
+            method: 'GET',
+            url: `${credentials.baseUrl}/transactions${queryString}`,
+            headers: {
+              'Accept': 'application/json'
+            },
+            json: true
+          };
+
+          if (credentials.apiKey) {
+            options.headers['Authorization'] = `Bearer ${credentials.apiKey}`;
+          }
+
+          result = await this.helpers.httpRequest(options) as any;
+          break;
+        }
+
+        case 'getTransactionOperations': {
+          const hash = this.getNodeParameter('hash', i) as string;
+          const cursor = this.getNodeParameter('cursor', i, '') as string;
+          const limit = this.getNodeParameter('limit', i, 10) as number;
+
+          const queryParams: string[] = [];
+          if (cursor) queryParams.push(`cursor=${encodeURIComponent(cursor)}`);
+          if (limit) queryParams.push(`limit=${limit}`);
+
+          const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
+          
+          const options: any = {
+            method: 'GET',
+            url: `${credentials.baseUrl}/transactions/${hash}/operations${queryString}`,
+            headers: {
+              'Accept': 'application/json'
+            },
+            json: true
+          };
+
+          if (credentials.apiKey) {
+            options.headers['Authorization'] = `Bearer ${credentials.apiKey}`;
+          }
+
+          result = await this.helpers.httpRequest(options) as any;
+          break;
+        }
+
+        case 'getTransactionEffects': {
+          const hash = this.getNodeParameter('hash', i) as string;
+          const cursor = this.getNodeParameter
