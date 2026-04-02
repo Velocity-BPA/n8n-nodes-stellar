@@ -1,18 +1,16 @@
-import { ICredentialType, INodeProperties } from 'n8n-workflow';
+import {
+	ICredentialType,
+	INodeProperties,
+} from 'n8n-workflow';
 
 export class StellarApi implements ICredentialType {
 	name = 'stellarApi';
 	displayName = 'Stellar API';
+	description = 'Stellar Horizon API credentials';
 	documentationUrl = 'https://developers.stellar.org/api';
+	icon = 'file:stellar.svg';
+
 	properties: INodeProperties[] = [
-		{
-			displayName: 'API Base URL',
-			name: 'baseUrl',
-			type: 'string',
-			default: 'https://horizon.stellar.org',
-			required: true,
-			description: 'The base URL of the Stellar Horizon API server',
-		},
 		{
 			displayName: 'API Key',
 			name: 'apiKey',
@@ -21,43 +19,31 @@ export class StellarApi implements ICredentialType {
 				password: true,
 			},
 			default: '',
-			required: false,
-			description: 'API key for authenticated requests (optional for read operations)',
+			description: 'API key for rate limit increases (optional for public endpoints)',
 		},
 		{
-			displayName: 'Network Passphrase',
-			name: 'networkPassphrase',
+			displayName: 'Base URL',
+			name: 'baseUrl',
+			type: 'string',
+			default: 'https://horizon.stellar.org',
+			description: 'Base URL for the Stellar Horizon API',
+		},
+		{
+			displayName: 'Network',
+			name: 'network',
 			type: 'options',
 			options: [
 				{
-					name: 'Public Network',
-					value: 'Public Global Stellar Network ; September 2015',
+					name: 'Public (Mainnet)',
+					value: 'public',
 				},
 				{
-					name: 'Test Network',
-					value: 'Test SDF Network ; September 2015',
-				},
-				{
-					name: 'Custom',
-					value: 'custom',
+					name: 'Test (Testnet)',
+					value: 'test',
 				},
 			],
-			default: 'Public Global Stellar Network ; September 2015',
-			required: true,
-			description: 'The network passphrase for the Stellar network',
-		},
-		{
-			displayName: 'Custom Network Passphrase',
-			name: 'customNetworkPassphrase',
-			type: 'string',
-			default: '',
-			required: false,
-			displayOptions: {
-				show: {
-					networkPassphrase: ['custom'],
-				},
-			},
-			description: 'Custom network passphrase when using a private network',
+			default: 'public',
+			description: 'Stellar network to connect to',
 		},
 	];
 }
