@@ -33,20 +33,20 @@ describe('Stellar Node', () => {
       expect(node.description.outputs).toContain('main');
     });
 
-    it('should define 6 resources', () => {
+    it('should define 7 resources', () => {
       const resourceProp = node.description.properties.find(
         (p: any) => p.name === 'resource'
       );
       expect(resourceProp).toBeDefined();
       expect(resourceProp!.type).toBe('options');
-      expect(resourceProp!.options).toHaveLength(6);
+      expect(resourceProp!.options).toHaveLength(7);
     });
 
     it('should have operation dropdowns for each resource', () => {
       const operations = node.description.properties.filter(
         (p: any) => p.name === 'operation'
       );
-      expect(operations.length).toBe(6);
+      expect(operations.length).toBe(7);
     });
 
     it('should require credentials', () => {
@@ -67,749 +67,1018 @@ describe('Stellar Node', () => {
   });
 
   // Resource-specific tests
-describe('Accounts Resource', () => {
+describe('Account Resource', () => {
   let mockExecuteFunctions: any;
 
   beforeEach(() => {
     mockExecuteFunctions = {
       getNodeParameter: jest.fn(),
-      getCredentials: jest.fn().mockResolvedValue({
-        apiKey: 'test-api-key',
-        baseUrl: 'https://horizon.stellar.org',
+      getCredentials: jest.fn().mockResolvedValue({ 
+        apiKey: 'test-key', 
+        baseUrl: 'https://horizon.stellar.org' 
       }),
       getInputData: jest.fn().mockReturnValue([{ json: {} }]),
       getNode: jest.fn().mockReturnValue({ name: 'Test Node' }),
       continueOnFail: jest.fn().mockReturnValue(false),
-      helpers: {
-        httpRequest: jest.fn(),
-        requestWithAuthentication: jest.fn(),
+      helpers: { 
+        httpRequest: jest.fn() 
       },
     };
   });
 
-  describe('getAccount', () => {
-    it('should get account details successfully', async () => {
+  describe('getAccount operation', () => {
+    it('should successfully get account details', async () => {
       const mockAccountData = {
-        account_id: 'GAHK7EEG2WWHVKDNT4CEQFZGKF2LGDSW2IVM4S5DP42RBW3K6BTODB4A',
-        sequence: '12884901888',
-        balances: [
-          {
-            balance: '10000.0000000',
-            asset_type: 'native',
-          },
-        ],
+        id: 'GDQJUTQYK2MQX2VGDR2FYWLIYAQIEGXTQVTFEMGH2BEWFG4BRUY4CKI7',
+        account_id: 'GDQJUTQYK2MQX2VGDR2FYWLIYAQIEGXTQVTFEMGH2BEWFG4BRUY4CKI7',
+        sequence: '1234567890',
+        balances: []
       };
 
-      mockExecuteFunctions.getNodeParameter.mockImplementation((paramName: string) => {
-        if (paramName === 'operation') return 'getAccount';
-        if (paramName === 'accountId') return 'GAHK7EEG2WWHVKDNT4CEQFZGKF2LGDSW2IVM4S5DP42RBW3K6BTODB4A';
-        return undefined;
-      });
-
+      mockExecuteFunctions.getNodeParameter
+        .mockReturnValueOnce('getAccount')
+        .mockReturnValueOnce('GDQJUTQYK2MQX2VGDR2FYWLIYAQIEGXTQVTFEMGH2BEWFG4BRUY4CKI7');
       mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockAccountData);
 
-      const result = await executeAccountsOperations.call(mockExecuteFunctions, [{ json: {} }]);
+      const result = await executeAccountOperations.call(mockExecuteFunctions, [{ json: {} }]);
 
-      expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual(mockAccountData);
       expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
         method: 'GET',
-        url: 'https://horizon.stellar.org/accounts/GAHK7EEG2WWHVKDNT4CEQFZGKF2LGDSW2IVM4S5DP42RBW3K6BTODB4A',
+        url: 'https://horizon.stellar.org/accounts/GDQJUTQYK2MQX2VGDR2FYWLIYAQIEGXTQVTFEMGH2BEWFG4BRUY4CKI7',
         headers: {
-          'X-Client-Name': 'n8n-stellar-node',
-          'Authorization': 'Bearer test-api-key',
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer test-key'
         },
         json: true,
       });
+      expect(result).toEqual([{ json: mockAccountData, pairedItem: { item: 0 } }]);
     });
 
-    it('should handle account not found error', async () => {
-      mockExecuteFunctions.getNodeParameter.mockImplementation((paramName: string) => {
-        if (paramName === 'operation') return 'getAccount';
-        if (paramName === 'accountId') return 'INVALID_ACCOUNT';
-        return undefined;
-      });
+    it('should handle errors when getting account fails', async () => {
+      mockExecuteFunctions.getNodeParameter
+        .mockReturnValueOnce('getAccount')
+        .mockReturnValueOnce('invalid-account-id');
+      mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(new Error('Account not found'));
+      mockExecuteFunctions.continueOnFail.mockReturnValue(true);
 
-      const error = new Error('Account not found');
-      (error as any).httpCode = 404;
-      mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
+      const result = await executeAccountOperations.call(mockExecuteFunctions, [{ json: {} }]);
 
-      await expect(
-        executeAccountsOperations.call(mockExecuteFunctions, [{ json: {} }])
-      ).rejects.toThrow();
+      expect(result).toEqual([{ json: { error: 'Account not found' }, pairedItem: { item: 0 } }]);
     });
   });
 
-  describe('getAccounts', () => {
-    it('should get accounts list successfully', async () => {
+  describe('getAccounts operation', () => {
+    it('should successfully get accounts list', async () => {
       const mockAccountsData = {
-        _embedded: {
-          records: [
-            {
-              account_id: 'GAHK7EEG2WWHVKDNT4CEQFZGKF2LGDSW2IVM4S5DP42RBW3K6BTODB4A',
-              sequence: '12884901888',
-            },
-          ],
-        },
+        _embedded: { records: [] },
+        _links: { next: { href: '' } }
       };
 
-      mockExecuteFunctions.getNodeParameter.mockImplementation((paramName: string) => {
-        if (paramName === 'operation') return 'getAccounts';
-        if (paramName === 'cursor') return '';
-        if (paramName === 'limit') return 10;
-        if (paramName === 'order') return 'asc';
-        return undefined;
-      });
-
+      mockExecuteFunctions.getNodeParameter
+        .mockReturnValueOnce('getAccounts')
+        .mockReturnValueOnce('')
+        .mockReturnValueOnce(10)
+        .mockReturnValueOnce('asc');
       mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockAccountsData);
 
-      const result = await executeAccountsOperations.call(mockExecuteFunctions, [{ json: {} }]);
+      const result = await executeAccountOperations.call(mockExecuteFunctions, [{ json: {} }]);
 
-      expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual(mockAccountsData);
-      expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
-        method: 'GET',
-        url: 'https://horizon.stellar.org/accounts?limit=10&order=asc',
-        headers: {
-          'X-Client-Name': 'n8n-stellar-node',
-          'Authorization': 'Bearer test-api-key',
-        },
-        json: true,
-      });
+      expect(result).toEqual([{ json: mockAccountsData, pairedItem: { item: 0 } }]);
     });
   });
 
-  describe('getAccountTransactions', () => {
-    it('should get account transactions successfully', async () => {
+  describe('getAccountTransactions operation', () => {
+    it('should successfully get account transactions', async () => {
       const mockTransactionsData = {
-        _embedded: {
-          records: [
-            {
-              id: 'transaction-id',
-              hash: 'transaction-hash',
-              source_account: 'GAHK7EEG2WWHVKDNT4CEQFZGKF2LGDSW2IVM4S5DP42RBW3K6BTODB4A',
-            },
-          ],
-        },
+        _embedded: { records: [] },
+        _links: { next: { href: '' } }
       };
 
-      mockExecuteFunctions.getNodeParameter.mockImplementation((paramName: string) => {
-        if (paramName === 'operation') return 'getAccountTransactions';
-        if (paramName === 'accountId') return 'GAHK7EEG2WWHVKDNT4CEQFZGKF2LGDSW2IVM4S5DP42RBW3K6BTODB4A';
-        if (paramName === 'cursor') return '';
-        if (paramName === 'limit') return 10;
-        if (paramName === 'order') return 'asc';
-        return undefined;
-      });
-
+      mockExecuteFunctions.getNodeParameter
+        .mockReturnValueOnce('getAccountTransactions')
+        .mockReturnValueOnce('GDQJUTQYK2MQX2VGDR2FYWLIYAQIEGXTQVTFEMGH2BEWFG4BRUY4CKI7')
+        .mockReturnValueOnce('')
+        .mockReturnValueOnce(10)
+        .mockReturnValueOnce('asc');
       mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockTransactionsData);
 
-      const result = await executeAccountsOperations.call(mockExecuteFunctions, [{ json: {} }]);
+      const result = await executeAccountOperations.call(mockExecuteFunctions, [{ json: {} }]);
 
-      expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual(mockTransactionsData);
+      expect(result).toEqual([{ json: mockTransactionsData, pairedItem: { item: 0 } }]);
     });
   });
 
-  describe('getAccountOperations', () => {
-    it('should get account operations successfully', async () => {
+  describe('getAccountOperations operation', () => {
+    it('should successfully get account operations', async () => {
       const mockOperationsData = {
-        _embedded: {
-          records: [
-            {
-              id: 'operation-id',
-              type: 'payment',
-              source_account: 'GAHK7EEG2WWHVKDNT4CEQFZGKF2LGDSW2IVM4S5DP42RBW3K6BTODB4A',
-            },
-          ],
-        },
+        _embedded: { records: [] },
+        _links: { next: { href: '' } }
       };
 
-      mockExecuteFunctions.getNodeParameter.mockImplementation((paramName: string) => {
-        if (paramName === 'operation') return 'getAccountOperations';
-        if (paramName === 'accountId') return 'GAHK7EEG2WWHVKDNT4CEQFZGKF2LGDSW2IVM4S5DP42RBW3K6BTODB4A';
-        if (paramName === 'cursor') return '';
-        if (paramName === 'limit') return 10;
-        if (paramName === 'order') return 'asc';
-        return undefined;
-      });
-
+      mockExecuteFunctions.getNodeParameter
+        .mockReturnValueOnce('getAccountOperations')
+        .mockReturnValueOnce('GDQJUTQYK2MQX2VGDR2FYWLIYAQIEGXTQVTFEMGH2BEWFG4BRUY4CKI7')
+        .mockReturnValueOnce('')
+        .mockReturnValueOnce(10)
+        .mockReturnValueOnce('asc');
       mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockOperationsData);
 
-      const result = await executeAccountsOperations.call(mockExecuteFunctions, [{ json: {} }]);
+      const result = await executeAccountOperations.call(mockExecuteFunctions, [{ json: {} }]);
 
-      expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual(mockOperationsData);
+      expect(result).toEqual([{ json: mockOperationsData, pairedItem: { item: 0 } }]);
     });
   });
 
-  describe('getAccountPayments', () => {
-    it('should get account payments successfully', async () => {
+  describe('getAccountPayments operation', () => {
+    it('should successfully get account payments', async () => {
       const mockPaymentsData = {
-        _embedded: {
-          records: [
-            {
-              id: 'payment-id',
-              type: 'payment',
-              amount: '100.0000000',
-              asset_type: 'native',
-            },
-          ],
-        },
+        _embedded: { records: [] },
+        _links: { next: { href: '' } }
       };
 
-      mockExecuteFunctions.getNodeParameter.mockImplementation((paramName: string) => {
-        if (paramName === 'operation') return 'getAccountPayments';
-        if (paramName === 'accountId') return 'GAHK7EEG2WWHVKDNT4CEQFZGKF2LGDSW2IVM4S5DP42RBW3K6BTODB4A';
-        if (paramName === 'cursor') return '';
-        if (paramName === 'limit') return 10;
-        if (paramName === 'order') return 'asc';
-        return undefined;
-      });
-
+      mockExecuteFunctions.getNodeParameter
+        .mockReturnValueOnce('getAccountPayments')
+        .mockReturnValueOnce('GDQJUTQYK2MQX2VGDR2FYWLIYAQIEGXTQVTFEMGH2BEWFG4BRUY4CKI7')
+        .mockReturnValueOnce('')
+        .mockReturnValueOnce(10)
+        .mockReturnValueOnce('asc');
       mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockPaymentsData);
 
-      const result = await executeAccountsOperations.call(mockExecuteFunctions, [{ json: {} }]);
+      const result = await executeAccountOperations.call(mockExecuteFunctions, [{ json: {} }]);
 
-      expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual(mockPaymentsData);
-    });
-  });
-
-  describe('getAccountEffects', () => {
-    it('should get account effects successfully', async () => {
-      const mockEffectsData = {
-        _embedded: {
-          records: [
-            {
-              id: 'effect-id',
-              type: 'account_credited',
-              amount: '100.0000000',
-              asset_type: 'native',
-            },
-          ],
-        },
-      };
-
-      mockExecuteFunctions.getNodeParameter.mockImplementation((paramName: string) => {
-        if (paramName === 'operation') return 'getAccountEffects';
-        if (paramName === 'accountId') return 'GAHK7EEG2WWHVKDNT4CEQFZGKF2LGDSW2IVM4S5DP42RBW3K6BTODB4A';
-        if (paramName === 'cursor') return '';
-        if (paramName === 'limit') return 10;
-        if (paramName === 'order') return 'asc';
-        return undefined;
-      });
-
-      mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockEffectsData);
-
-      const result = await executeAccountsOperations.call(mockExecuteFunctions, [{ json: {} }]);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual(mockEffectsData);
-    });
-  });
-
-  describe('error handling', () => {
-    it('should continue on fail when continueOnFail is true', async () => {
-      mockExecuteFunctions.continueOnFail.mockReturnValue(true);
-      mockExecuteFunctions.getNodeParameter.mockImplementation((paramName: string) => {
-        if (paramName === 'operation') return 'getAccount';
-        if (paramName === 'accountId') return 'INVALID_ACCOUNT';
-        return undefined;
-      });
-
-      const error = new Error('Network error');
-      mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
-
-      const result = await executeAccountsOperations.call(mockExecuteFunctions, [{ json: {} }]);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].json.error).toBe('Network error');
-    });
-
-    it('should throw error for unknown operation', async () => {
-      mockExecuteFunctions.getNodeParameter.mockImplementation((paramName: string) => {
-        if (paramName === 'operation') return 'unknownOperation';
-        return undefined;
-      });
-
-      await expect(
-        executeAccountsOperations.call(mockExecuteFunctions, [{ json: {} }])
-      ).rejects.toThrow('Unknown operation: unknownOperation');
+      expect(result).toEqual([{ json: mockPaymentsData, pairedItem: { item: 0 } }]);
     });
   });
 });
 
-describe('Assets Resource', () => {
+describe('Transaction Resource', () => {
   let mockExecuteFunctions: any;
 
   beforeEach(() => {
     mockExecuteFunctions = {
       getNodeParameter: jest.fn(),
       getCredentials: jest.fn().mockResolvedValue({
-        apiKey: 'test-api-key',
-        baseUrl: 'https://horizon.stellar.org',
+        apiKey: 'test-key',
+        baseUrl: 'https://horizon.stellar.org'
       }),
       getInputData: jest.fn().mockReturnValue([{ json: {} }]),
       getNode: jest.fn().mockReturnValue({ name: 'Test Node' }),
       continueOnFail: jest.fn().mockReturnValue(false),
       helpers: {
         httpRequest: jest.fn(),
-        requestWithAuthentication: jest.fn(),
-      },
+        requestWithAuthentication: jest.fn()
+      }
     };
   });
 
-  describe('getAssets', () => {
-    it('should get assets successfully', async () => {
-      const mockResponse = {
-        _embedded: {
-          records: [
-            {
-              asset_type: 'credit_alphanum4',
-              asset_code: 'USD',
-              asset_issuer: 'GCKFBEIYTKP5RHALAV2R6AIZDJWDOGN6N24PWNZSM4WCPGAOVQOVZKMZ',
-            },
-          ],
-        },
-      };
-
-      mockExecuteFunctions.getNodeParameter.mockImplementation((param: string, i: number, defaultValue?: any) => {
-        const params: any = {
-          operation: 'getAssets',
-          asset_code: 'USD',
-          limit: 10,
-          order: 'asc',
-        };
-        return params[param] || defaultValue;
-      });
-
+  describe('submitTransaction', () => {
+    it('should submit a transaction successfully', async () => {
+      const mockResponse = { hash: 'tx123', successful: true };
+      mockExecuteFunctions.getNodeParameter
+        .mockReturnValueOnce('submitTransaction')
+        .mockReturnValueOnce('AAAA...XDR...');
       mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
 
-      const result = await executeAssetsOperations.call(mockExecuteFunctions, [{ json: {} }]);
+      const items = [{ json: {} }];
+      const result = await executeTransactionOperations.call(mockExecuteFunctions, items);
 
-      expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual(mockResponse);
-      expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
-        method: 'GET',
-        url: 'https://horizon.stellar.org/assets',
-        headers: {
-          'Authorization': 'Bearer test-api-key',
-          'Content-Type': 'application/json',
-        },
-        qs: {
-          asset_code: 'USD',
-          limit: 10,
-          order: 'asc',
-        },
-        json: true,
-      });
-    });
-  });
-
-  describe('getAsset', () => {
-    it('should get specific asset successfully', async () => {
-      const mockResponse = {
-        asset_type: 'credit_alphanum4',
-        asset_code: 'USD',
-        asset_issuer: 'GCKFBEIYTKP5RHALAV2R6AIZDJWDOGN6N24PWNZSM4WCPGAOVQOVZKMZ',
-      };
-
-      mockExecuteFunctions.getNodeParameter.mockImplementation((param: string) => {
-        const params: any = {
-          operation: 'getAsset',
-          asset_code: 'USD',
-          asset_issuer: 'GCKFBEIYTKP5RHALAV2R6AIZDJWDOGN6N24PWNZSM4WCPGAOVQOVZKMZ',
-        };
-        return params[param];
-      });
-
-      mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
-
-      const result = await executeAssetsOperations.call(mockExecuteFunctions, [{ json: {} }]);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual(mockResponse);
-    });
-  });
-
-  describe('createAsset', () => {
-    it('should create asset successfully', async () => {
-      const mockResponse = {
-        hash: 'test-transaction-hash',
-        result: 'success',
-      };
-
-      mockExecuteFunctions.getNodeParameter.mockImplementation((param: string, i: number, defaultValue?: any) => {
-        const params: any = {
-          operation: 'createAsset',
-          asset_code: 'MYTOKEN',
-          limit: '1000000',
-          authorize_flags: ['AUTHORIZATION_REQUIRED'],
-        };
-        return params[param] || defaultValue;
-      });
-
-      mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
-
-      const result = await executeAssetsOperations.call(mockExecuteFunctions, [{ json: {} }]);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual(mockResponse);
       expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
         method: 'POST',
         url: 'https://horizon.stellar.org/transactions',
         headers: {
-          'Authorization': 'Bearer test-api-key',
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': 'Bearer test-key'
         },
-        body: {
-          operations: [
-            {
-              type: 'create_asset',
-              asset_code: 'MYTOKEN',
-              limit: '1000000',
-              authorize_flags: ['AUTHORIZATION_REQUIRED'],
-            },
-          ],
+        form: {
+          tx: 'AAAA...XDR...'
         },
-        json: true,
+        json: true
       });
-    });
-  });
-
-  describe('changeAssetTrust', () => {
-    it('should change asset trust successfully', async () => {
-      const mockResponse = {
-        hash: 'test-transaction-hash',
-        result: 'success',
-      };
-
-      mockExecuteFunctions.getNodeParameter.mockImplementation((param: string, i: number, defaultValue?: any) => {
-        const params: any = {
-          operation: 'changeAssetTrust',
-          asset: 'USD:GCKFBEIYTKP5RHALAV2R6AIZDJWDOGN6N24PWNZSM4WCPGAOVQOVZKMZ',
-          limit: '10000',
-        };
-        return params[param] || defaultValue;
-      });
-
-      mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
-
-      const result = await executeAssetsOperations.call(mockExecuteFunctions, [{ json: {} }]);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual(mockResponse);
-    });
-  });
-
-  describe('setAssetOptions', () => {
-    it('should set asset options successfully', async () => {
-      const mockResponse = {
-        hash: 'test-transaction-hash',
-        result: 'success',
-      };
-
-      mockExecuteFunctions.getNodeParameter.mockImplementation((param: string, i: number, defaultValue?: any) => {
-        const params: any = {
-          operation: 'setAssetOptions',
-          set_flags: ['AUTHORIZATION_REQUIRED'],
-          master_weight: 2,
-        };
-        return params[param] || defaultValue;
-      });
-
-      mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
-
-      const result = await executeAssetsOperations.call(mockExecuteFunctions, [{ json: {} }]);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual(mockResponse);
-    });
-  });
-
-  describe('error handling', () => {
-    it('should handle API errors', async () => {
-      mockExecuteFunctions.getNodeParameter.mockImplementation((param: string) => {
-        const params: any = {
-          operation: 'getAssets',
-        };
-        return params[param];
-      });
-
-      const error = new Error('API Error');
-      mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
-
-      await expect(executeAssetsOperations.call(mockExecuteFunctions, [{ json: {} }])).rejects.toThrow();
+      expect(result).toEqual([{ json: mockResponse, pairedItem: { item: 0 } }]);
     });
 
-    it('should continue on fail when configured', async () => {
+    it('should handle submit transaction error', async () => {
+      mockExecuteFunctions.getNodeParameter
+        .mockReturnValueOnce('submitTransaction')
+        .mockReturnValueOnce('invalid-xdr');
+      mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(new Error('Invalid transaction'));
       mockExecuteFunctions.continueOnFail.mockReturnValue(true);
-      mockExecuteFunctions.getNodeParameter.mockImplementation((param: string) => {
-        const params: any = {
-          operation: 'getAssets',
-        };
-        return params[param];
+
+      const items = [{ json: {} }];
+      const result = await executeTransactionOperations.call(mockExecuteFunctions, items);
+
+      expect(result).toEqual([{ json: { error: 'Invalid transaction' }, pairedItem: { item: 0 } }]);
+    });
+  });
+
+  describe('getTransaction', () => {
+    it('should get a transaction by hash successfully', async () => {
+      const mockResponse = { hash: 'tx123', ledger: 12345 };
+      mockExecuteFunctions.getNodeParameter
+        .mockReturnValueOnce('getTransaction')
+        .mockReturnValueOnce('tx123');
+      mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+
+      const items = [{ json: {} }];
+      const result = await executeTransactionOperations.call(mockExecuteFunctions, items);
+
+      expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+        method: 'GET',
+        url: 'https://horizon.stellar.org/transactions/tx123',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer test-key'
+        },
+        json: true
       });
+      expect(result).toEqual([{ json: mockResponse, pairedItem: { item: 0 } }]);
+    });
+  });
 
-      const error = new Error('API Error');
-      mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(error);
+  describe('getTransactions', () => {
+    it('should get transactions with filters successfully', async () => {
+      const mockResponse = { _embedded: { records: [] } };
+      mockExecuteFunctions.getNodeParameter
+        .mockReturnValueOnce('getTransactions')
+        .mockReturnValueOnce('cursor123')
+        .mockReturnValueOnce(20)
+        .mockReturnValueOnce('desc');
+      mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
 
-      const result = await executeAssetsOperations.call(mockExecuteFunctions, [{ json: {} }]);
+      const items = [{ json: {} }];
+      const result = await executeTransactionOperations.call(mockExecuteFunctions, items);
 
-      expect(result).toHaveLength(1);
-      expect(result[0].json.error).toBe('API Error');
+      expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+        method: 'GET',
+        url: 'https://horizon.stellar.org/transactions?cursor=cursor123&limit=20&order=desc',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer test-key'
+        },
+        json: true
+      });
+      expect(result).toEqual([{ json: mockResponse, pairedItem: { item: 0 } }]);
+    });
+  });
+
+  describe('getTransactionOperations', () => {
+    it('should get transaction operations successfully', async () => {
+      const mockResponse = { _embedded: { records: [] } };
+      mockExecuteFunctions.getNodeParameter
+        .mockReturnValueOnce('getTransactionOperations')
+        .mockReturnValueOnce('tx123')
+        .mockReturnValueOnce('')
+        .mockReturnValueOnce(10);
+      mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+
+      const items = [{ json: {} }];
+      const result = await executeTransactionOperations.call(mockExecuteFunctions, items);
+
+      expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+        method: 'GET',
+        url: 'https://horizon.stellar.org/transactions/tx123/operations?limit=10',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer test-key'
+        },
+        json: true
+      });
+      expect(result).toEqual([{ json: mockResponse, pairedItem: { item: 0 } }]);
+    });
+  });
+
+  describe('getTransactionEffects', () => {
+    it('should get transaction effects successfully', async () => {
+      const mockResponse = { _embedded: { records: [] } };
+      mockExecuteFunctions.getNodeParameter
+        .mockReturnValueOnce('getTransactionEffects')
+        .mockReturnValueOnce('tx123')
+        .mockReturnValueOnce('cursor456')
+        .mockReturnValueOnce(15);
+      mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+
+      const items = [{ json: {} }];
+      const result = await executeTransactionOperations.call(mockExecuteFunctions, items);
+
+      expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+        method: 'GET',
+        url: 'https://horizon.stellar.org/transactions/tx123/effects?cursor=cursor456&limit=15',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer test-key'
+        },
+        json: true
+      });
+      expect(result).toEqual([{ json: mockResponse, pairedItem: { item: 0 } }]);
     });
   });
 });
 
-describe('SorobanContracts Resource', () => {
+describe('Payment Resource', () => {
   let mockExecuteFunctions: any;
 
   beforeEach(() => {
     mockExecuteFunctions = {
       getNodeParameter: jest.fn(),
-      getCredentials: jest.fn().mockResolvedValue({
-        apiKey: 'test-api-key',
-        baseUrl: 'https://horizon.stellar.org',
+      getCredentials: jest.fn().mockResolvedValue({ 
+        apiKey: 'test-key', 
+        baseUrl: 'https://horizon.stellar.org' 
       }),
       getInputData: jest.fn().mockReturnValue([{ json: {} }]),
       getNode: jest.fn().mockReturnValue({ name: 'Test Node' }),
       continueOnFail: jest.fn().mockReturnValue(false),
-      helpers: {
+      helpers: { httpRequest: jest.fn(), requestWithAuthentication: jest.fn() },
+    };
+  });
+
+  it('should get all payments successfully', async () => {
+    mockExecuteFunctions.getNodeParameter
+      .mockReturnValueOnce('getPayments')
+      .mockReturnValueOnce('')
+      .mockReturnValueOnce(10)
+      .mockReturnValueOnce('asc');
+
+    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
+      _embedded: { records: [] },
+      _links: {}
+    });
+
+    const result = await executePaymentOperations.call(mockExecuteFunctions, [{ json: {} }]);
+    
+    expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+      method: 'GET',
+      url: 'https://horizon.stellar.org/payments?limit=10&order=asc',
+      headers: { 
+        'Accept': 'application/json',
+        'Authorization': 'Bearer test-key'
+      },
+      json: true,
+    });
+    expect(result).toHaveLength(1);
+  });
+
+  it('should get specific payment successfully', async () => {
+    mockExecuteFunctions.getNodeParameter
+      .mockReturnValueOnce('getPayment')
+      .mockReturnValueOnce('123456789');
+
+    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
+      id: '123456789',
+      type: 'payment'
+    });
+
+    const result = await executePaymentOperations.call(mockExecuteFunctions, [{ json: {} }]);
+    
+    expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+      method: 'GET',
+      url: 'https://horizon.stellar.org/payments/123456789',
+      headers: { 
+        'Accept': 'application/json',
+        'Authorization': 'Bearer test-key'
+      },
+      json: true,
+    });
+    expect(result).toHaveLength(1);
+  });
+
+  it('should get account payments successfully', async () => {
+    mockExecuteFunctions.getNodeParameter
+      .mockReturnValueOnce('getAccountPayments')
+      .mockReturnValueOnce('GABC123')
+      .mockReturnValueOnce('')
+      .mockReturnValueOnce(10)
+      .mockReturnValueOnce('desc');
+
+    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
+      _embedded: { records: [] },
+      _links: {}
+    });
+
+    const result = await executePaymentOperations.call(mockExecuteFunctions, [{ json: {} }]);
+    
+    expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+      method: 'GET',
+      url: 'https://horizon.stellar.org/accounts/GABC123/payments?limit=10&order=desc',
+      headers: { 
+        'Accept': 'application/json',
+        'Authorization': 'Bearer test-key'
+      },
+      json: true,
+    });
+    expect(result).toHaveLength(1);
+  });
+
+  it('should handle errors with continueOnFail', async () => {
+    mockExecuteFunctions.getNodeParameter.mockReturnValueOnce('getPayments');
+    mockExecuteFunctions.continueOnFail.mockReturnValue(true);
+    mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(new Error('API Error'));
+
+    const result = await executePaymentOperations.call(mockExecuteFunctions, [{ json: {} }]);
+    
+    expect(result).toHaveLength(1);
+    expect(result[0].json.error).toBe('API Error');
+  });
+
+  it('should throw error when continueOnFail is false', async () => {
+    mockExecuteFunctions.getNodeParameter.mockReturnValueOnce('getPayments');
+    mockExecuteFunctions.continueOnFail.mockReturnValue(false);
+    mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(new Error('API Error'));
+
+    await expect(executePaymentOperations.call(mockExecuteFunctions, [{ json: {} }])).rejects.toThrow('API Error');
+  });
+});
+
+describe('Asset Resource', () => {
+	let mockExecuteFunctions: any;
+
+	beforeEach(() => {
+		mockExecuteFunctions = {
+			getNodeParameter: jest.fn(),
+			getCredentials: jest.fn().mockResolvedValue({
+				apiKey: 'test-key',
+				baseUrl: 'https://horizon.stellar.org',
+			}),
+			getInputData: jest.fn().mockReturnValue([{ json: {} }]),
+			getNode: jest.fn().mockReturnValue({ name: 'Test Node' }),
+			continueOnFail: jest.fn().mockReturnValue(false),
+			helpers: {
+				httpRequest: jest.fn(),
+				requestWithAuthentication: jest.fn(),
+			},
+		};
+	});
+
+	describe('getAssets operation', () => {
+		it('should get assets successfully', async () => {
+			const mockResponse = {
+				_embedded: {
+					records: [
+						{
+							asset_type: 'credit_alphanum4',
+							asset_code: 'USD',
+							asset_issuer: 'GCKFBEIYTKP5RDBMHAJLZKBF',
+							num_accounts: 100,
+							amount: '1000000.0000000',
+						},
+					],
+				},
+			};
+
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('getAssets')
+				.mockReturnValueOnce('USD')
+				.mockReturnValueOnce('GCKFBEIYTKP5RDBMHAJLZKBF')
+				.mockReturnValueOnce('')
+				.mockReturnValueOnce(10)
+				.mockReturnValueOnce('asc');
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+
+			const items = [{ json: {} }];
+			const result = await executeAssetOperations.call(mockExecuteFunctions, items);
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://horizon.stellar.org/assets?asset_code=USD&asset_issuer=GCKFBEIYTKP5RDBMHAJLZKBF&limit=10&order=asc',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': 'Bearer test-key',
+				},
+				json: true,
+			});
+
+			expect(result).toEqual([
+				{
+					json: mockResponse,
+					pairedItem: { item: 0 },
+				},
+			]);
+		});
+
+		it('should handle getAssets errors', async () => {
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('getAssets')
+				.mockReturnValueOnce('')
+				.mockReturnValueOnce('')
+				.mockReturnValueOnce('')
+				.mockReturnValueOnce(10)
+				.mockReturnValueOnce('asc');
+
+			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(new Error('API Error'));
+			mockExecuteFunctions.continueOnFail.mockReturnValue(true);
+
+			const items = [{ json: {} }];
+			const result = await executeAssetOperations.call(mockExecuteFunctions, items);
+
+			expect(result).toEqual([
+				{
+					json: { error: 'API Error' },
+					pairedItem: { item: 0 },
+				},
+			]);
+		});
+	});
+
+	describe('getAccountBalances operation', () => {
+		it('should get account balances successfully', async () => {
+			const mockResponse = [
+				{
+					balance: '10000.0000000',
+					asset_type: 'native',
+				},
+				{
+					balance: '500.0000000',
+					asset_type: 'credit_alphanum4',
+					asset_code: 'USD',
+					asset_issuer: 'GCKFBEIYTKP5RDBMHAJLZKBF',
+				},
+			];
+
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('getAccountBalances')
+				.mockReturnValueOnce('GDQNY3PBOJOKYZSRMK2S7LHHGWZIUISD4QORETLMXEWXBI7KFZZMKTL3');
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+
+			const items = [{ json: {} }];
+			const result = await executeAssetOperations.call(mockExecuteFunctions, items);
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://horizon.stellar.org/accounts/GDQNY3PBOJOKYZSRMK2S7LHHGWZIUISD4QORETLMXEWXBI7KFZZMKTL3/balances',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': 'Bearer test-key',
+				},
+				json: true,
+			});
+
+			expect(result).toEqual([
+				{
+					json: mockResponse,
+					pairedItem: { item: 0 },
+				},
+			]);
+		});
+	});
+
+	describe('getAsset operation', () => {
+		it('should get specific asset successfully', async () => {
+			const mockResponse = {
+				asset_type: 'credit_alphanum4',
+				asset_code: 'USD',
+				asset_issuer: 'GCKFBEIYTKP5RDBMHAJLZKBF',
+				num_accounts: 100,
+				amount: '1000000.0000000',
+			};
+
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('getAsset')
+				.mockReturnValueOnce('USD')
+				.mockReturnValueOnce('GCKFBEIYTKP5RDBMHAJLZKBF');
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+
+			const items = [{ json: {} }];
+			const result = await executeAssetOperations.call(mockExecuteFunctions, items);
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+				method: 'GET',
+				url: 'https://horizon.stellar.org/assets/USD/GCKFBEIYTKP5RDBMHAJLZKBF',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': 'Bearer test-key',
+				},
+				json: true,
+			});
+
+			expect(result).toEqual([
+				{
+					json: mockResponse,
+					pairedItem: { item: 0 },
+				},
+			]);
+		});
+
+		it('should handle getAsset errors', async () => {
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('getAsset')
+				.mockReturnValueOnce('USD')
+				.mockReturnValueOnce('GCKFBEIYTKP5RDBMHAJLZKBF');
+
+			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(new Error('Asset not found'));
+			mockExecuteFunctions.continueOnFail.mockReturnValue(false);
+
+			const items = [{ json: {} }];
+
+			await expect(executeAssetOperations.call(mockExecuteFunctions, items)).rejects.toThrow('Asset not found');
+		});
+	});
+});
+
+describe('Orderbook Resource', () => {
+  let mockExecuteFunctions: any;
+
+  beforeEach(() => {
+    mockExecuteFunctions = {
+      getNodeParameter: jest.fn(),
+      getCredentials: jest.fn().mockResolvedValue({ baseUrl: 'https://horizon.stellar.org' }),
+      getInputData: jest.fn().mockReturnValue([{ json: {} }]),
+      getNode: jest.fn().mockReturnValue({ name: 'Test Node' }),
+      continueOnFail: jest.fn().mockReturnValue(false),
+      helpers: { httpRequest: jest.fn(), requestWithAuthentication: jest.fn() },
+    };
+  });
+
+  it('should get orderbook successfully', async () => {
+    mockExecuteFunctions.getNodeParameter
+      .mockReturnValueOnce('getOrderbook')
+      .mockReturnValueOnce('native')
+      .mockReturnValueOnce('credit_alphanum4')
+      .mockReturnValueOnce(10)
+      .mockReturnValueOnce('USD')
+      .mockReturnValueOnce('GCKFBEIYTKP6RCZNVXG2FFADK7NZEH2S4UQSCX6CCGXXWW33IHHVZQH3');
+
+    const mockOrderbook = {
+      bids: [{ price: '1.5000000', amount: '100.0000000' }],
+      asks: [{ price: '1.5100000', amount: '50.0000000' }]
+    };
+    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockOrderbook);
+
+    const result = await executeOrderbookOperations.call(mockExecuteFunctions, [{ json: {} }]);
+
+    expect(result).toEqual([{ json: mockOrderbook, pairedItem: { item: 0 } }]);
+    expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+      method: 'GET',
+      url: expect.stringContaining('/order_book'),
+      json: true,
+    });
+  });
+
+  it('should get trades successfully', async () => {
+    mockExecuteFunctions.getNodeParameter
+      .mockReturnValueOnce('getTrades')
+      .mockReturnValueOnce(20)
+      .mockReturnValueOnce('')
+      .mockReturnValueOnce('desc');
+
+    const mockTrades = {
+      _embedded: { records: [{ id: 'trade1' }] }
+    };
+    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockTrades);
+
+    const result = await executeOrderbookOperations.call(mockExecuteFunctions, [{ json: {} }]);
+
+    expect(result).toEqual([{ json: mockTrades, pairedItem: { item: 0 } }]);
+    expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+      method: 'GET',
+      url: expect.stringContaining('/trades'),
+      json: true,
+    });
+  });
+
+  it('should get account trades successfully', async () => {
+    mockExecuteFunctions.getNodeParameter
+      .mockReturnValueOnce('getAccountTrades')
+      .mockReturnValueOnce('GCKFBEIYTKP6RCZNVXG2FFADK7NZEH2S4UQSCX6CCGXXWW33IHHVZQH3')
+      .mockReturnValueOnce(15)
+      .mockReturnValueOnce('cursor123')
+      .mockReturnValueOnce('asc');
+
+    const mockAccountTrades = {
+      _embedded: { records: [{ id: 'trade1' }] }
+    };
+    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockAccountTrades);
+
+    const result = await executeOrderbookOperations.call(mockExecuteFunctions, [{ json: {} }]);
+
+    expect(result).toEqual([{ json: mockAccountTrades, pairedItem: { item: 0 } }]);
+    expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+      method: 'GET',
+      url: expect.stringContaining('/accounts/GCKFBEIYTKP6RCZNVXG2FFADK7NZEH2S4UQSCX6CCGXXWW33IHHVZQH3/trades'),
+      json: true,
+    });
+  });
+
+  it('should handle errors when continueOnFail is true', async () => {
+    mockExecuteFunctions.getNodeParameter.mockReturnValueOnce('getOrderbook');
+    mockExecuteFunctions.continueOnFail.mockReturnValue(true);
+    mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(new Error('API Error'));
+
+    const result = await executeOrderbookOperations.call(mockExecuteFunctions, [{ json: {} }]);
+
+    expect(result).toEqual([{ json: { error: 'API Error' }, pairedItem: { item: 0 } }]);
+  });
+
+  it('should throw error when continueOnFail is false', async () => {
+    mockExecuteFunctions.getNodeParameter.mockReturnValueOnce('getOrderbook');
+    mockExecuteFunctions.continueOnFail.mockReturnValue(false);
+    mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(new Error('API Error'));
+
+    await expect(executeOrderbookOperations.call(mockExecuteFunctions, [{ json: {} }])).rejects.toThrow('API Error');
+  });
+});
+
+describe('Ledger Resource', () => {
+  let mockExecuteFunctions: any;
+
+  beforeEach(() => {
+    mockExecuteFunctions = {
+      getNodeParameter: jest.fn(),
+      getCredentials: jest.fn().mockResolvedValue({ 
+        apiKey: 'test-key', 
+        baseUrl: 'https://horizon.stellar.org' 
+      }),
+      getInputData: jest.fn().mockReturnValue([{ json: {} }]),
+      getNode: jest.fn().mockReturnValue({ name: 'Test Node' }),
+      continueOnFail: jest.fn().mockReturnValue(false),
+      helpers: { 
         httpRequest: jest.fn(),
-        requestWithAuthentication: jest.fn(),
+        requestWithAuthentication: jest.fn() 
       },
     };
   });
 
-  it('should invoke contract successfully', async () => {
-    mockExecuteFunctions.getNodeParameter.mockImplementation((param: string, index: number) => {
-      const params: any = {
-        operation: 'invokeContract',
-        contract_address: 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM',
-        function_name: 'hello',
-        parameters: '["world"]',
-        source_account: 'GDJVFDG5OCW5PYWHB64MGTHGFF57DRRJEDUEFDEL2SLNIOONHYJWHA3Z',
-      };
-      return params[param];
+  it('should get ledgers successfully', async () => {
+    mockExecuteFunctions.getNodeParameter
+      .mockReturnValueOnce('getLedgers')
+      .mockReturnValueOnce('')
+      .mockReturnValueOnce(10)
+      .mockReturnValueOnce('asc');
+    
+    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
+      _embedded: { records: [] },
+      _links: {}
     });
 
-    const mockResponse = {
-      jsonrpc: '2.0',
-      id: 1,
-      result: {
-        transactionData: 'success',
-        minResourceFee: '100',
-      },
-    };
-
-    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
-
-    const result = await executeSorobanContractsOperations.call(mockExecuteFunctions, [{ json: {} }]);
+    const items = [{ json: {} }];
+    const result = await executeLedgerOperations.call(mockExecuteFunctions, items);
 
     expect(result).toHaveLength(1);
-    expect(result[0].json).toEqual(mockResponse);
     expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
-      method: 'POST',
-      url: 'https://horizon.stellar.org/soroban/rpc',
+      method: 'GET',
+      url: 'https://horizon.stellar.org/ledgers?limit=10&order=asc',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer test-api-key',
-      },
-      body: {
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'simulateTransaction',
-        params: {
-          transaction: {
-            sourceAccount: 'GDJVFDG5OCW5PYWHB64MGTHGFF57DRRJEDUEFDEL2SLNIOONHYJWHA3Z',
-            operations: [{
-              type: 'invokeHostFunction',
-              hostFunction: {
-                type: 'invokeContract',
-                contractAddress: 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM',
-                functionName: 'hello',
-                args: ['world'],
-              },
-            }],
-          },
-        },
+        'Accept': 'application/json',
+        'Authorization': 'Bearer test-key',
       },
       json: true,
     });
   });
 
-  it('should simulate transaction successfully', async () => {
-    mockExecuteFunctions.getNodeParameter.mockImplementation((param: string, index: number) => {
-      const params: any = {
-        operation: 'simulateTransaction',
-        transaction: '{"sourceAccount":"GDJVFDG5OCW5PYWHB64MGTHGFF57DRRJEDUEFDEL2SLNIOONHYJWHA3Z","operations":[]}',
-      };
-      return params[param];
+  it('should get specific ledger successfully', async () => {
+    mockExecuteFunctions.getNodeParameter
+      .mockReturnValueOnce('getLedger')
+      .mockReturnValueOnce('12345');
+    
+    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
+      id: 'ledger-id',
+      sequence: 12345
     });
 
-    const mockResponse = {
-      jsonrpc: '2.0',
-      id: 1,
-      result: {
-        transactionData: 'simulated',
-        cost: {
-          cpuInsns: '1000',
-          memBytes: '2000',
-        },
+    const items = [{ json: {} }];
+    const result = await executeLedgerOperations.call(mockExecuteFunctions, items);
+
+    expect(result).toHaveLength(1);
+    expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+      method: 'GET',
+      url: 'https://horizon.stellar.org/ledgers/12345',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer test-key',
       },
-    };
-
-    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
-
-    const result = await executeSorobanContractsOperations.call(mockExecuteFunctions, [{ json: {} }]);
-
-    expect(result).toHaveLength(1);
-    expect(result[0].json).toEqual(mockResponse);
+      json: true,
+    });
   });
 
-  it('should get contract successfully', async () => {
-    mockExecuteFunctions.getNodeParameter.mockImplementation((param: string, index: number) => {
-      const params: any = {
-        operation: 'getContract',
-        contract_id: 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM',
-      };
-      return params[param];
+  it('should get ledger transactions successfully', async () => {
+    mockExecuteFunctions.getNodeParameter
+      .mockReturnValueOnce('getLedgerTransactions')
+      .mockReturnValueOnce('12345')
+      .mockReturnValueOnce('')
+      .mockReturnValueOnce(10);
+    
+    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
+      _embedded: { records: [] }
     });
 
-    const mockResponse = {
-      id: 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM',
-      source_account: 'GDJVFDG5OCW5PYWHB64MGTHGFF57DRRJEDUEFDEL2SLNIOONHYJWHA3Z',
-      asset_code: 'XLM',
-    };
-
-    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
-
-    const result = await executeSorobanContractsOperations.call(mockExecuteFunctions, [{ json: {} }]);
+    const items = [{ json: {} }];
+    const result = await executeLedgerOperations.call(mockExecuteFunctions, items);
 
     expect(result).toHaveLength(1);
-    expect(result[0].json).toEqual(mockResponse);
-  });
-
-  it('should deploy contract successfully', async () => {
-    mockExecuteFunctions.getNodeParameter.mockImplementation((param: string, index: number) => {
-      const params: any = {
-        operation: 'deployContract',
-        contract_wasm: '0061736d01000000',
-        constructor_args: '["arg1","arg2"]',
-      };
-      return params[param];
-    });
-
-    const mockResponse = {
-      hash: 'abcd1234',
-      ledger: 12345,
-      envelope_xdr: 'encoded_envelope',
-      result_xdr: 'encoded_result',
-    };
-
-    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
-
-    const result = await executeSorobanContractsOperations.call(mockExecuteFunctions, [{ json: {} }]);
-
-    expect(result).toHaveLength(1);
-    expect(result[0].json).toEqual(mockResponse);
-  });
-
-  it('should get contract data successfully', async () => {
-    mockExecuteFunctions.getNodeParameter.mockImplementation((param: string, index: number) => {
-      const params: any = {
-        operation: 'getContractData',
-        contract_address: 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM',
-        key: 'balance',
-        durability: 'persistent',
-      };
-      return params[param];
-    });
-
-    const mockResponse = {
-      jsonrpc: '2.0',
-      id: 1,
-      result: {
-        entries: [{
-          key: 'balance',
-          val: '1000',
-          liveUntilLedgerSeq: 123456,
-        }],
+    expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+      method: 'GET',
+      url: 'https://horizon.stellar.org/ledgers/12345/transactions?limit=10',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer test-key',
       },
-    };
-
-    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
-
-    const result = await executeSorobanContractsOperations.call(mockExecuteFunctions, [{ json: {} }]);
-
-    expect(result).toHaveLength(1);
-    expect(result[0].json).toEqual(mockResponse);
-  });
-
-  it('should get ledger entries successfully', async () => {
-    mockExecuteFunctions.getNodeParameter.mockImplementation((param: string, index: number) => {
-      const params: any = {
-        operation: 'getLedgerEntries',
-        keys: '["key1","key2"]',
-      };
-      return params[param];
+      json: true,
     });
-
-    const mockResponse = {
-      jsonrpc: '2.0',
-      id: 1,
-      result: {
-        entries: [
-          { key: 'key1', xdr: 'encoded_data1' },
-          { key: 'key2', xdr: 'encoded_data2' },
-        ],
-      },
-    };
-
-    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
-
-    const result = await executeSorobanContractsOperations.call(mockExecuteFunctions, [{ json: {} }]);
-
-    expect(result).toHaveLength(1);
-    expect(result[0].json).toEqual(mockResponse);
   });
 
-  it('should handle API errors', async () => {
-    mockExecuteFunctions.getNodeParameter.mockImplementation((param: string, index: number) => {
-      const params: any = {
-        operation: 'getContract',
-        contract_id: 'invalid-contract',
-      };
-      return params[param];
-    });
-
-    const mockError = new Error('Contract not found');
-    mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(mockError);
-
-    await expect(
-      executeSorobanContractsOperations.call(mockExecuteFunctions, [{ json: {} }])
-    ).rejects.toThrow('Contract not found');
-  });
-
-  it('should continue on fail when enabled', async () => {
+  it('should handle errors gracefully when continueOnFail is true', async () => {
+    mockExecuteFunctions.getNodeParameter.mockReturnValueOnce('getLedger');
     mockExecuteFunctions.continueOnFail.mockReturnValue(true);
-    mockExecuteFunctions.getNodeParameter.mockImplementation((param: string, index: number) => {
-      const params: any = {
-        operation: 'getContract',
-        contract_id: 'invalid-contract',
-      };
-      return params[param];
-    });
+    mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(new Error('API Error'));
 
-    const mockError = new Error('Contract not found');
-    mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(mockError);
-
-    const result = await executeSorobanContractsOperations.call(mockExecuteFunctions, [{ json: {} }]);
+    const items = [{ json: {} }];
+    const result = await executeLedgerOperations.call(mockExecuteFunctions, items);
 
     expect(result).toHaveLength(1);
-    expect(result[0].json).toEqual({ error: 'Contract not found' });
+    expect(result[0].json.error).toBe('API Error');
+  });
+
+  it('should throw error when continueOnFail is false', async () => {
+    mockExecuteFunctions.getNodeParameter.mockReturnValueOnce('getLedger');
+    mockExecuteFunctions.continueOnFail.mockReturnValue(false);
+    mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(new Error('API Error'));
+
+    const items = [{ json: {} }];
+
+    await expect(executeLedgerOperations.call(mockExecuteFunctions, items))
+      .rejects.toThrow('API Error');
+  });
+});
+
+describe('Operation Resource', () => {
+  let mockExecuteFunctions: any;
+
+  beforeEach(() => {
+    mockExecuteFunctions = {
+      getNodeParameter: jest.fn(),
+      getCredentials: jest.fn().mockResolvedValue({
+        apiKey: 'test-key',
+        baseUrl: 'https://horizon.stellar.org'
+      }),
+      getInputData: jest.fn().mockReturnValue([{ json: {} }]),
+      getNode: jest.fn().mockReturnValue({ name: 'Test Node' }),
+      continueOnFail: jest.fn().mockReturnValue(false),
+      helpers: {
+        httpRequest: jest.fn(),
+        requestWithAuthentication: jest.fn()
+      }
+    };
+  });
+
+  describe('getOperations', () => {
+    it('should successfully retrieve all operations', async () => {
+      const mockResponse = {
+        _embedded: { records: [] },
+        _links: { next: { href: 'next-page' } }
+      };
+
+      mockExecuteFunctions.getNodeParameter
+        .mockReturnValueOnce('getOperations')
+        .mockReturnValueOnce('')
+        .mockReturnValueOnce(10)
+        .mockReturnValueOnce('asc');
+
+      mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+
+      const result = await executeOperationOperations.call(mockExecuteFunctions, [{ json: {} }]);
+
+      expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+        method: 'GET',
+        url: 'https://horizon.stellar.org/operations?limit=10&order=asc',
+        headers: {
+          'Authorization': 'Bearer test-key',
+          'Accept': 'application/json'
+        },
+        json: true
+      });
+
+      expect(result).toEqual([{
+        json: mockResponse,
+        pairedItem: { item: 0 }
+      }]);
+    });
+
+    it('should handle errors when retrieving operations', async () => {
+      mockExecuteFunctions.getNodeParameter.mockReturnValue('getOperations');
+      mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(new Error('API Error'));
+      mockExecuteFunctions.continueOnFail.mockReturnValue(true);
+
+      const result = await executeOperationOperations.call(mockExecuteFunctions, [{ json: {} }]);
+
+      expect(result).toEqual([{
+        json: { error: 'API Error' },
+        pairedItem: { item: 0 }
+      }]);
+    });
+  });
+
+  describe('getOperation', () => {
+    it('should successfully retrieve specific operation', async () => {
+      const mockResponse = {
+        id: '12884905985',
+        type: 'payment',
+        account: 'GACMZD5VJXTRLKVET72CETCYKELPNCOTTBDC6DHFEUPLG5DHEK534LEUVA6'
+      };
+
+      mockExecuteFunctions.getNodeParameter
+        .mockReturnValueOnce('getOperation')
+        .mockReturnValueOnce('12884905985');
+
+      mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+
+      const result = await executeOperationOperations.call(mockExecuteFunctions, [{ json: {} }]);
+
+      expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+        method: 'GET',
+        url: 'https://horizon.stellar.org/operations/12884905985',
+        headers: {
+          'Authorization': 'Bearer test-key',
+          'Accept': 'application/json'
+        },
+        json: true
+      });
+
+      expect(result).toEqual([{
+        json: mockResponse,
+        pairedItem: { item: 0 }
+      }]);
+    });
+
+    it('should handle errors when retrieving specific operation', async () => {
+      mockExecuteFunctions.getNodeParameter.mockReturnValue('getOperation');
+      mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(new Error('Operation not found'));
+      mockExecuteFunctions.continueOnFail.mockReturnValue(true);
+
+      const result = await executeOperationOperations.call(mockExecuteFunctions, [{ json: {} }]);
+
+      expect(result).toEqual([{
+        json: { error: 'Operation not found' },
+        pairedItem: { item: 0 }
+      }]);
+    });
+  });
+
+  describe('getAccountOperations', () => {
+    it('should successfully retrieve account operations', async () => {
+      const mockResponse = {
+        _embedded: { records: [] }
+      };
+
+      mockExecuteFunctions.getNodeParameter
+        .mockReturnValueOnce('getAccountOperations')
+        .mockReturnValueOnce('GACMZD5VJXTRLKVET72CETCYKELPNCOTTBDC6DHFEUPLG5DHEK534LEUVA6')
+        .mockReturnValueOnce('')
+        .mockReturnValueOnce(10)
+        .mockReturnValueOnce('asc');
+
+      mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+
+      const result = await executeOperationOperations.call(mockExecuteFunctions, [{ json: {} }]);
+
+      expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+        method: 'GET',
+        url: 'https://horizon.stellar.org/accounts/GACMZD5VJXTRLKVET72CETCYKELPNCOTTBDC6DHFEUPLG5DHEK534LEUVA6/operations?limit=10&order=asc',
+        headers: {
+          'Authorization': 'Bearer test-key',
+          'Accept': 'application/json'
+        },
+        json: true
+      });
+
+      expect(result).toEqual([{
+        json: mockResponse,
+        pairedItem: { item: 0 }
+      }]);
+    });
+  });
+
+  describe('getTransactionOperations', () => {
+    it('should successfully retrieve transaction operations', async () => {
+      const mockResponse = {
+        _embedded: { records: [] }
+      };
+
+      mockExecuteFunctions.getNodeParameter
+        .mockReturnValueOnce('getTransactionOperations')
+        .mockReturnValueOnce('abcd1234efgh5678ijkl9012mnop3456qrst7890')
+        .mockReturnValueOnce('')
+        .mockReturnValueOnce(10);
+
+      mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+
+      const result = await executeOperationOperations.call(mockExecuteFunctions, [{ json: {} }]);
+
+      expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+        method: 'GET',
+        url: 'https://horizon.stellar.org/transactions/abcd1234efgh5678ijkl9012mnop3456qrst7890/operations?limit=10',
+        headers: {
+          'Authorization': 'Bearer test-key',
+          'Accept': 'application/json'
+        },
+        json: true
+      });
+
+      expect(result).toEqual([{
+        json: mockResponse,
+        pairedItem: { item: 0 }
+      }]);
+    });
   });
 });
 });
